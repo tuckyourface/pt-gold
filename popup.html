@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="popup.css" />
+  <title>PT Gold</title>
+</head>
+<body>
+  <div class="case">
+    <!-- Fluted bezel -->
+    <div class="bezel"></div>
+
+    <header class="crown-head">
+      <div class="crown">
+        <svg viewBox="0 0 64 44" aria-hidden="true">
+          <path d="M6 38 L10 14 L22 26 L32 8 L42 26 L54 14 L58 38 Z" />
+          <circle cx="10" cy="13" r="3.4" />
+          <circle cx="32" cy="6.5" r="3.8" />
+          <circle cx="54" cy="13" r="3.4" />
+          <rect x="6" y="38" width="52" height="4.5" rx="1" />
+        </svg>
+      </div>
+      <h1>PT GOLD</h1>
+      <p class="tagline">CERTIFIED · FORUM MODERATOR</p>
+      <div class="divider"><span></span></div>
+    </header>
+
+    <!-- Master switch -->
+    <section class="master">
+      <div class="master-label">
+        <span class="master-title">Moderation</span>
+        <span class="master-state" id="stateLabel">ACTIVE</span>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="enabled" checked />
+        <span class="track"><span class="thumb"></span></span>
+      </label>
+    </section>
+
+    <div class="stat">
+      <span class="stat-num" id="hiddenCount">0</span>
+      <span class="stat-unit">items concealed on this page</span>
+    </div>
+
+    <!-- Handles -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Blocked Handles</h2>
+        <span class="hint">posts, threads &amp; quotes</span>
+      </div>
+      <form class="add" data-list="handles">
+        <span class="at">@</span>
+        <input type="text" placeholder="username" autocomplete="off" spellcheck="false" />
+        <button type="submit" aria-label="Add handle">＋</button>
+      </form>
+      <div class="chips" id="handlesChips"></div>
+    </section>
+
+    <!-- Keywords -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Blocked Keywords</h2>
+        <span class="hint">titles &amp; post text</span>
+      </div>
+      <form class="add" data-list="keywords">
+        <span class="at">#</span>
+        <input type="text" placeholder="word or phrase" autocomplete="off" spellcheck="false" />
+        <button type="submit" aria-label="Add keyword">＋</button>
+      </form>
+      <div class="chips" id="keywordsChips"></div>
+    </section>
+
+    <footer>
+      <span class="serial">PT&nbsp;GOLD · SUPERLATIVE&nbsp;MODERATOR</span>
+      <span class="osc">CERTIFIED</span>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

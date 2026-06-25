@@ -1,0 +1,20 @@
+# OS cruft
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+Thumbs.db
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*~
+
+# Build artifacts / distributables
+*.zip
+dist/
+
+# Python cache (from make_icons.py)
+__pycache__/
+*.pyc
