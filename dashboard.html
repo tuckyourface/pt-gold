@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="theme.css" />
+  <link rel="stylesheet" href="dashboard.css" />
+  <title>PT Gold</title>
+</head>
+<body>
+  <header class="db-head">
+    <div class="brand">
+      <span class="brand-mark">PT</span>
+      <span class="brand-name">PT&nbsp;<span class="lt">GOLD</span></span>
+    </div>
+    <div class="db-head-actions">
+      <button id="checkBtn" class="btn btn-sm" title="Check for new mentions now">
+        <span class="check-ic">⟳</span> Check
+      </button>
+      <button id="popBtn" class="btn btn-icon btn-ghost" title="Open in a full tab">⤢</button>
+    </div>
+  </header>
+
+  <nav class="db-tabs">
+    <button class="db-tab on" data-view="feed">Mentions</button>
+    <button class="db-tab" data-view="board">Board</button>
+    <button class="db-tab" data-view="moderate">Moderate</button>
+    <button class="db-tab" data-view="settings">Settings</button>
+  </nav>
+
+  <!-- ====================== FEED ====================== -->
+  <section id="view-feed" class="view">
+    <div class="feed-bar">
+      <div class="seg" id="kindSeg">
+        <button class="on" data-kind="all">All <span class="badge" id="c-all">0</span></button>
+        <button data-kind="post">Posts <span class="badge" id="c-post">0</span></button>
+        <button data-kind="thread">Threads <span class="badge" id="c-thread">0</span></button>
+      </div>
+      <div class="grow"></div>
+      <label class="unread-toggle" title="Show only unread"><input type="checkbox" id="unreadOnly" /> Unread</label>
+    </div>
+
+    <div class="feed-search">
+      <span class="search-ic">⌕</span>
+      <input id="searchBox" type="text" placeholder="Filter by author, thread, or text…" autocomplete="off" spellcheck="false" />
+      <button id="searchClear" class="search-clear" hidden aria-label="Clear">×</button>
+    </div>
+
+    <div class="feed-meta">
+      <span id="status" class="mute2">—</span>
+      <div class="grow"></div>
+      <button id="markAll" class="linkbtn">Mark all read</button>
+      <button id="clearAll" class="linkbtn danger">Clear</button>
+    </div>
+
+    <main id="list" class="feed" tabindex="0"></main>
+
+    <footer class="feed-foot">
+      <span class="kbd-hints">
+        <kbd>↑</kbd><kbd>↓</kbd> move · <kbd>↵</kbd> expand · <kbd>o</kbd> open · <kbd>r</kbd> read · <kbd>x</kbd> dismiss
+      </span>
+    </footer>
+  </section>
+
+  <!-- ====================== BOARD ====================== -->
+  <section id="view-board" class="view" hidden>
+    <div class="feed-bar">
+      <div class="seg" id="boardSort">
+        <button class="on" data-sort="active">Active</button>
+        <button data-sort="busiest">Busiest</button>
+      </div>
+      <div class="grow"></div>
+      <button id="boardRefresh" class="btn btn-sm" title="Refresh">↻</button>
+    </div>
+    <div class="board-groups" id="boardGroups"></div>
+    <div class="feed-meta"><span id="boardStatus" class="mute2">—</span></div>
+    <main id="boardList" class="feed"></main>
+  </section>
+
+  <!-- ====================== MODERATE ====================== -->
+  <section id="view-moderate" class="view" hidden>
+    <div class="set-scroll">
+      <div class="set-group">
+        <div class="set-group-head"><span class="h-label">Hide content</span><span class="h-eyebrow">on-page moderation</span></div>
+        <div class="opt"><span>Enable hiding</span>
+          <label class="sw"><input type="checkbox" id="mod-enabled" /><span class="slot"><span class="knob"></span></span></label></div>
+        <p class="set-hint" style="margin:6px 0 4px">Hides matching threads, posts, and quoted nests as you browse the forum.</p>
+        <div class="set-sub">
+          <span class="set-sublabel">Blocked handles</span>
+          <form class="field" data-list="handles"><span class="pre">@</span><input type="text" placeholder="username" autocomplete="off" spellcheck="false" /><button type="submit" class="add-btn" aria-label="Add">+</button></form>
+          <div class="chips" id="handlesChips"></div>
+        </div>
+        <div class="set-sub">
+          <span class="set-sublabel">Blocked keywords</span>
+          <form class="field" data-list="keywords"><span class="pre">#</span><input type="text" placeholder="word or phrase" autocomplete="off" spellcheck="false" /><button type="submit" class="add-btn" aria-label="Add">+</button></form>
+          <div class="chips" id="keywordsChips"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====================== SETTINGS ====================== -->
+  <section id="view-settings" class="view" hidden>
+    <div class="set-scroll">
+      <div class="set-group">
+        <div class="set-group-head"><span class="h-label">Site appearance</span><span class="h-eyebrow">forum skin</span></div>
+        <div class="seg seg-full" id="skinSeg">
+          <button data-skin="original" class="on">Original</button>
+          <button data-skin="dark">Dark</button>
+          <button data-skin="light">Light</button>
+        </div>
+      </div>
+
+      <hr class="sep" />
+
+      <div class="set-group">
+        <div class="set-group-head"><span class="h-label">Your handle</span><span class="h-eyebrow">tracked for mentions</span></div>
+        <form class="field" id="handleForm">
+          <span class="pre">@</span>
+          <input type="text" id="myHandle" placeholder="your forum username" autocomplete="off" spellcheck="false" />
+          <button type="submit" class="add-btn" aria-label="Save">✓</button>
+        </form>
+        <p class="set-hint">Every reply, quote, and @-mention of this handle across the whole forum lands in Mentions.</p>
+      </div>
+
+      <hr class="sep" />
+
+      <div class="set-group">
+        <div class="set-group-head"><span class="h-label">Watch keywords</span><span class="h-eyebrow">forum-wide</span></div>
+        <form class="field" data-list="watchKeywords">
+          <span class="pre">#</span>
+          <input type="text" placeholder="word or phrase" autocomplete="off" spellcheck="false" />
+          <button type="submit" class="add-btn" aria-label="Add">+</button>
+        </form>
+        <div class="chips" id="watchChips" style="margin-top:8px"></div>
+      </div>
+
+      <hr class="sep" />
+
+      <div class="set-group">
+        <div class="set-group-head"><span class="h-label">Notifications</span></div>
+        <div class="opt"><span>Desktop notifications</span>
+          <label class="sw"><input type="checkbox" id="n-desktop" /><span class="slot"><span class="knob"></span></span></label></div>
+        <div class="opt"><span class="opt-sub">Direct quotes of you</span>
+          <label class="sw"><input type="checkbox" id="n-direct" /><span class="slot"><span class="knob"></span></span></label></div>
+        <div class="opt"><span class="opt-sub">Nested (indirect) quotes</span>
+          <label class="sw"><input type="checkbox" id="n-nested" /><span class="slot"><span class="knob"></span></span></label></div>
+        <div class="opt"><span class="opt-sub">@-mentions (no quote)</span>
+          <label class="sw"><input type="checkbox" id="n-mention" /><span class="slot"><span class="knob"></span></span></label></div>
+        <div class="opt"><span class="opt-sub">Keyword hits</span>
+          <label class="sw"><input type="checkbox" id="n-keywords" /><span class="slot"><span class="knob"></span></span></label></div>
+        <div class="opt"><span>Toolbar unread badge</span>
+          <label class="sw"><input type="checkbox" id="n-badge" /><span class="slot"><span class="knob"></span></span></label></div>
+      </div>
+
+      <hr class="sep" />
+
+      <div class="set-group">
+        <div class="set-group-head"><span class="h-label">Checking</span><span class="h-eyebrow">background</span></div>
+        <div class="opt"><span>Check every</span>
+          <div class="select-wrap"><select id="pollMinutes">
+            <option value="1">1 min</option><option value="3">3 min</option>
+            <option value="5">5 min</option><option value="10">10 min</option>
+            <option value="15">15 min</option><option value="30">30 min</option>
+          </select></div>
+        </div>
+        <div class="opt"><span>Look back</span>
+          <div class="select-wrap"><select id="lookbackDays">
+            <option value="7">7 days</option><option value="14">14 days</option>
+            <option value="30">30 days</option><option value="60">60 days</option>
+            <option value="90">90 days</option><option value="365">1 year</option>
+          </select></div>
+        </div>
+        <p class="set-hint">Runs while your browser is open — no forum tab required. Search is public, so it works even when you’re logged out.</p>
+      </div>
+
+      <hr class="sep" />
+
+      <div class="set-group">
+        <div class="set-group-head"><span class="h-label">Snapshot</span><span class="h-eyebrow">thread analysis</span></div>
+        <div class="opt"><span>Enable on thread pages</span>
+          <label class="sw"><input type="checkbox" id="rx-enabled" /><span class="slot"><span class="knob"></span></span></label></div>
+        <div class="opt"><span class="opt-sub">Quote-count chips</span>
+          <label class="sw"><input type="checkbox" id="rx-badges" /><span class="slot"><span class="knob"></span></span></label></div>
+        <div class="opt"><span class="opt-sub">Stats panel</span>
+          <label class="sw"><input type="checkbox" id="rx-panel" /><span class="slot"><span class="knob"></span></span></label></div>
+        <div class="opt"><span>Rows in lists</span>
+          <div class="stepper-inline">
+            <button type="button" id="rx-dec" aria-label="Fewer">–</button>
+            <span id="rx-topn">5</span>
+            <button type="button" id="rx-inc" aria-label="More">+</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script src="dashboard.js"></script>
+</body>
+</html>

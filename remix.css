@@ -1,0 +1,79 @@
+/* =========================================================================
+ * PT Gold — Thread Stats styles (injected into forum thread pages)
+ * Scoped to #ptg-stats / .ptg-* only — NO global/element resets, so the
+ * forum's own layout is untouched. Palette mirrors the extension theme.
+ * ========================================================================= */
+
+/* per-post collapse caret */
+.ptg-caret {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; margin-right: 6px; vertical-align: middle;
+  border: none; border-radius: 5px; cursor: pointer;
+  font-size: 11px; line-height: 1; color: #0c0d10;
+  background: linear-gradient(150deg, #d8bd86, #c9a86a 75%, #b3925a);
+}
+.ptg-caret:hover { filter: brightness(1.07); }
+.ptg-collapsed-body { display: none !important; }
+
+/* quote-count chip on a post */
+.ptg-qchip {
+  display: inline-block; margin-left: 8px; padding: 1px 8px; vertical-align: middle;
+  font-size: 11px; font-weight: 700; color: #c9a86a;
+  background: rgba(201,168,106,0.12); border: 1px solid rgba(201,168,106,0.3);
+  border-radius: 10px;
+}
+
+/* flash when scrolled to from the stats panel */
+@keyframes ptgFlash { 0% { background: rgba(201,168,106,0.28); } 100% { background: transparent; } }
+.ptg-flash { animation: ptgFlash 1.5s ease-out; }
+
+/* ===== stats panel ===== */
+#ptg-stats {
+  margin: 0 0 14px; padding: 0; border-radius: 10px; overflow: hidden;
+  font-family: ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: #edeff2; background: #14161b; border: 1px solid #262a32;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+}
+#ptg-stats * { box-sizing: border-box; }
+
+#ptg-stats .ptg-head {
+  display: flex; align-items: center; gap: 9px;
+  padding: 9px 13px; border-bottom: 1px solid #20242c;
+  background: linear-gradient(180deg, rgba(201,168,106,0.06), transparent);
+}
+#ptg-stats .ptg-title {
+  font-size: 11px; font-weight: 700; letter-spacing: 2px; color: #d8bd86;
+}
+#ptg-stats .ptg-scope { font-size: 10px; letter-spacing: .5px; color: #828b98; }
+#ptg-stats .ptg-btn {
+  margin-left: auto; font-family: inherit; font-size: 11px; font-weight: 600; cursor: pointer;
+  color: #0c0d10; background: linear-gradient(150deg, #d8bd86, #c9a86a 75%, #b3925a);
+  border: none; border-radius: 7px; padding: 5px 11px;
+}
+#ptg-stats .ptg-btn:hover { filter: brightness(1.06); }
+#ptg-stats .ptg-btn[disabled] { opacity: .55; cursor: default; }
+
+#ptg-stats .ptg-metrics {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  border-bottom: 1px solid #20242c;
+}
+#ptg-stats .ptg-metric { padding: 11px 8px; text-align: center; border-right: 1px solid #20242c; }
+#ptg-stats .ptg-metric:last-child { border-right: none; }
+#ptg-stats .ptg-metric-v { font-size: 18px; font-weight: 700; color: #edeff2; letter-spacing: .3px; }
+#ptg-stats .ptg-metric-l { font-size: 9.5px; letter-spacing: 1px; text-transform: uppercase; color: #828b98; margin-top: 2px; }
+
+#ptg-stats .ptg-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #20242c; }
+#ptg-stats .ptg-col { background: #14161b; padding: 11px 13px; }
+#ptg-stats .ptg-col-h { font-size: 9.5px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #828b98; margin-bottom: 9px; }
+
+#ptg-stats .ptg-bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+#ptg-stats .ptg-bar-name { font-size: 12px; color: #edeff2; width: 38%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#ptg-stats .ptg-bar-wrap { flex: 1; height: 6px; background: #20242c; border-radius: 4px; overflow: hidden; }
+#ptg-stats .ptg-bar { display: block; height: 100%; background: linear-gradient(90deg, #b3925a, #d8bd86); border-radius: 4px; }
+#ptg-stats .ptg-bar-n { font-size: 11px; font-weight: 700; color: #b6bcc7; width: 22px; text-align: right; }
+
+#ptg-stats .ptg-q-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 7px; margin: 0 -7px; border-radius: 6px; cursor: pointer; }
+#ptg-stats .ptg-q-row:hover { background: #1a1d24; }
+#ptg-stats .ptg-q-name { font-size: 12px; color: #edeff2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#ptg-stats .ptg-q-n { font-size: 11px; font-weight: 700; color: #c9a86a; flex: 0 0 auto; }
+#ptg-stats .ptg-empty { font-size: 11px; color: #828b98; }

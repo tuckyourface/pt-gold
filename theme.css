@@ -1,0 +1,161 @@
+/* =========================================================================
+ * PT Gold — shared design system
+ * Restrained, professional dark UI. One champagne accent, hairline borders,
+ * system type. Used by both the popup and the dashboard so they read as one
+ * product.
+ * ========================================================================= */
+:root {
+  --bg:         #0c0d10;
+  --surface:    #14161b;
+  --surface-2:  #1a1d24;
+  --surface-3:  #20242c;
+  --border:     #262a32;
+  --border-2:   #1d2026;
+  --text:       #edeff2;
+  --text-dim:   #b6bcc7;
+  --text-mute:  #828b98;
+  --accent:     #c9a86a;            /* champagne */
+  --accent-2:   #d8bd86;
+  --accent-soft:rgba(201,168,106,0.12);
+  --accent-line:rgba(201,168,106,0.28);
+  --green:      #2f9e6f;            /* subtle brand nod, used sparingly */
+  --danger:     #d57b6c;
+  --radius:     10px;
+  --radius-sm:  7px;
+  --font: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+
+/* Light theme — driven by <html data-theme="light"> (set from the skin choice).
+   Flipping the tokens re-themes every token-based component automatically. */
+:root[data-theme="light"] {
+  --bg:        #eceef1;
+  --surface:   #ffffff;
+  --surface-2: #f3f5f8;
+  --surface-3: #e7ebf0;
+  --border:    #d7dce2;
+  --border-2:  #e6e9ed;
+  --text:      #1b1f25;
+  --text-dim:  #515b67;
+  --text-mute: #88909c;
+  --accent:    #a8823f;
+  --accent-2:  #c19a52;
+  --accent-soft: rgba(168,130,63,0.13);
+  --accent-line: rgba(168,130,63,0.42);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font); color: var(--text); background: var(--bg); -webkit-font-smoothing: antialiased; }
+
+/* scrollbar */
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-thumb { background: #2a2e37; border-radius: 6px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: #353a45; background-clip: padding-box; }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* ---- brand ---- */
+.brand { display: flex; align-items: center; gap: 9px; }
+.brand-mark {
+  width: 24px; height: 24px; border-radius: 6px; flex: 0 0 auto;
+  display: grid; place-items: center;
+  font-size: 10px; font-weight: 800; letter-spacing: 0.5px;
+  color: #0c0d10;
+  background: linear-gradient(150deg, var(--accent-2), var(--accent) 70%, #ab8c52);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.25);
+}
+.brand-name { font-size: 13px; font-weight: 600; letter-spacing: 2.5px; color: var(--text); }
+.brand-name .lt { color: var(--accent); }
+
+/* ---- typography helpers ---- */
+.h-label { font-size: 11px; font-weight: 600; letter-spacing: 0.4px; color: var(--text); }
+.h-eyebrow { font-size: 9.5px; font-weight: 600; letter-spacing: 1.4px; text-transform: uppercase; color: var(--text-mute); }
+.muted { color: var(--text-dim); }
+.mute2 { color: var(--text-mute); }
+
+/* ---- buttons ---- */
+.btn {
+  font-family: inherit; font-size: 12px; font-weight: 550;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 7px 12px; border-radius: var(--radius-sm); cursor: pointer;
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--text);
+  transition: background .12s, border-color .12s, opacity .12s;
+}
+.btn:hover { background: var(--surface-3); border-color: #313641; }
+.btn:active { transform: translateY(0.5px); }
+.btn[disabled] { opacity: .5; cursor: default; }
+.btn-accent {
+  border-color: transparent; color: #0c0d10;
+  background: linear-gradient(150deg, var(--accent-2), var(--accent) 75%, #b3925a);
+  font-weight: 650;
+}
+.btn-accent:hover { filter: brightness(1.06); background: linear-gradient(150deg, var(--accent-2), var(--accent) 75%, #b3925a); }
+.btn-ghost { background: transparent; }
+.btn-ghost:hover { background: var(--surface-2); }
+.btn-sm { padding: 4px 9px; font-size: 11px; }
+.btn-icon { padding: 6px; width: 30px; }
+
+/* ---- inputs ---- */
+.field {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 0 4px 0 10px; transition: border-color .12s;
+}
+.field:focus-within { border-color: var(--accent-line); }
+.field .pre { color: var(--text-mute); font-size: 12px; flex: 0 0 auto; }
+.field input {
+  flex: 1; min-width: 0; background: transparent; border: none; outline: none;
+  color: var(--text); font-family: inherit; font-size: 12.5px; padding: 8px 0;
+}
+.field input::placeholder { color: var(--text-mute); }
+.field .add-btn {
+  width: 26px; height: 26px; border-radius: 6px; border: none; cursor: pointer;
+  display: grid; place-items: center; font-size: 15px; line-height: 1; color: #0c0d10;
+  background: var(--accent); flex: 0 0 auto;
+}
+.field .add-btn:hover { background: var(--accent-2); }
+
+/* ---- chips ---- */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--text); padding: 4px 6px 4px 10px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 7px;
+}
+.chip .pre { color: var(--accent); font-weight: 600; }
+.chip .rm {
+  cursor: pointer; color: var(--text-mute); font-size: 14px; line-height: 1;
+  width: 16px; height: 16px; display: grid; place-items: center; border-radius: 4px;
+}
+.chip .rm:hover { color: var(--text); background: var(--surface-3); }
+.chips-empty { font-size: 11px; color: var(--text-mute); }
+
+/* ---- switch ---- */
+.sw { position: relative; display: inline-block; flex: 0 0 auto; }
+.sw input { position: absolute; opacity: 0; width: 0; height: 0; }
+.sw .slot {
+  display: block; width: 34px; height: 20px; border-radius: 12px;
+  background: #2a2e37; transition: background .15s; position: relative;
+}
+.sw .knob {
+  position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%;
+  background: #cfd3da; transition: transform .15s, background .15s;
+}
+.sw input:checked + .slot { background: var(--accent); }
+.sw input:checked + .slot .knob { transform: translateX(14px); background: #0c0d10; }
+
+/* ---- rows / cards ---- */
+.row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.card { background: var(--surface); border: 1px solid var(--border-2); border-radius: var(--radius); }
+.sep { height: 1px; background: var(--border-2); border: none; }
+
+/* ---- segmented control ---- */
+.seg { display: inline-flex; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 2px; gap: 2px; }
+.seg button {
+  font-family: inherit; font-size: 11.5px; font-weight: 550; color: var(--text-dim);
+  background: transparent; border: none; cursor: pointer; padding: 5px 11px; border-radius: 6px;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.seg button:hover { color: var(--text); }
+.seg button.on { background: var(--surface-3); color: var(--text); }
+.seg .badge { font-size: 9.5px; font-weight: 700; color: var(--text-mute); }
+.seg button.on .badge { color: var(--accent); }

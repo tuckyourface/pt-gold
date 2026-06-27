@@ -1,91 +1,123 @@
 # PT Gold 👑
 
-A customizable moderator for the **Phish forum on Phantasy Tour**
-(`https://www.phantasytour.com/bands/phish/` and every child page).
+A power-user companion for the **Phish forum on Phantasy Tour**
+(`https://www.phantasytour.com/bands/phish/`). It lives in the **Chrome side
+panel** and adds forum-wide mention tracking, a topic board, on-page
+moderation, per-thread analytics, and dark/light skins for the site.
 
-Hide threads, posts, and **posts containing quoted nests** that match user
-handles or keywords you define. Preferences persist across browser sessions
-via `chrome.storage.sync`.
+Everything runs locally in your browser. The forum's public search/topic APIs
+power the data — **no account credentials are ever stored**, and the mention
+search even works while you're logged out.
 
-## What it hides
+| Mentions | Board | Settings |
+|---|---|---|
+| ![Mentions](docs/mentions.png) | ![Board](docs/board.png) | ![Settings](docs/settings.png) |
 
-| Surface | Hidden when… |
-|---|---|
-| **Thread list** (forum home) | thread starter is a blocked handle, **or** the title contains a blocked keyword |
-| **Posts** (thread pages) | the author is a blocked handle, **or** the post *quotes* a blocked handle, **or** the post text (including quoted text) contains a blocked keyword |
+> Screenshots use placeholder (lorem ipsum) content.
 
-Hiding uses `display: none`. The site renders its lists client-side with
-Knockout.js, so the content script uses a `MutationObserver` (plus a few timed
-passes) to re-apply after every async render and pagination change.
+---
 
 ## Install
 
-### Chrome / Brave / Edge (Chromium) — no build needed
+**Chrome / Brave / Edge** (Chromium — the primary target):
 
-1. Open `chrome://extensions` (or `brave://extensions`, `edge://extensions`)
-2. Toggle **Developer mode** (top-right)
-3. Click **Load unpacked** and select this folder (`pt-gold/`)
-4. Visit the Phish forum — the toolbar badge shows how many items are concealed
-5. Click the **PT Gold** crown icon to manage handles & keywords
+1. Open `chrome://extensions` (or `brave://extensions`, `edge://extensions`).
+2. Toggle **Developer mode** (top-right).
+3. Click **Load unpacked** and select this folder (`pt-gold/`).
+4. Click the **PT Gold** toolbar icon — it opens the **side panel**.
+5. Open **Settings → Your handle** and enter your forum username to start
+   tracking mentions.
 
-### Firefox
+> The side-panel UI uses Chrome's `sidePanel` API, so Chromium browsers are the
+> supported target. Firefox/Safari would need a sidebar/port adaptation.
 
-1. Add a `browser_specific_settings` block to `manifest.json` (Firefox needs an
-   add-on ID for `storage.sync`):
-   ```json
-   "browser_specific_settings": { "gecko": { "id": "pt-gold@local", "strict_min_version": "121.0" } }
-   ```
-2. Open `about:debugging` → **This Firefox** → **Load Temporary Add-on** and pick
-   `manifest.json`. (Temporary add-ons are removed on restart; a permanent
-   install requires signing the package through Mozilla AMO.)
+---
 
-### Safari (macOS) — requires Xcode
+## Features & how to use them
 
-> ⚠️ **Heads-up for Apple users:** Safari cannot load an unpacked extension
-> folder the way Chrome and Firefox can. Every Safari extension must be wrapped
-> in a native macOS app and **built with Xcode**. **There is no way around
-> this** — it is an Apple platform requirement, not a limitation of PT Gold.
-> The conversion tool (`safari-web-extension-converter`) ships *inside* Xcode,
-> so the full **Xcode** app must be installed (the Command Line Tools alone are
-> not enough). If you don't want to install Xcode, just use Chrome, Brave, or
-> Firefox instead — they need no build step.
+### 🔔 Mentions — forum-wide mention tracking
+The **Mentions** tab is an inbox of every time you're referenced anywhere on the
+board. A background worker periodically searches the forum for your handle and
+your watch-keywords (using the site's public search), even with no forum tab
+open and even when you're logged out.
 
-If you do have Xcode:
+- **Set it up:** Settings → **Your handle** (your username). Optionally add
+  **Watch keywords** (forum-wide phrases to track).
+- **Direct vs. nested quotes:** each mention is tagged **Direct quote** (someone
+  replied to you directly) or **Nested quote** (you're quoted deeper in a reply
+  chain).
+- **Read the mention fast:** click a card to expand. It leads with the
+  responder's actual reply, then shows the quoted context — **your quoted words
+  are highlighted**, and each quote layer is color-coded by depth.
+- **Jump to it:** **Open to this post ↗** opens the thread and scrolls straight
+  to the exact post (walking pagination if needed).
+- **Sort/filter:** segmented **All / Posts / Threads**, an **Unread** filter, and
+  a live search box.
+- **Keyboard:** `↑ ↓` / `j k` move · `↵` expand · `o` open · `r` read · `x` dismiss.
+- **Notifications:** Settings → Notifications has independent toggles for
+  **Direct quotes**, **Nested quotes**, **@-mentions**, and **Keyword hits**,
+  plus a desktop-notification master and a toolbar unread badge. Set the
+  background **Check every** interval and **Look back** window there too.
 
-1. Run Apple's converter against this folder:
-   ```bash
-   xcrun safari-web-extension-converter /path/to/pt-gold
-   ```
-   This generates an Xcode project wrapping the extension in a small macOS app.
-2. Open the generated project in Xcode and press **Run** (▶) to build and
-   install the host app.
-3. In Safari: **Settings → Advanced →** enable *“Show features for web
-   developers”*, then **Develop → Allow Unsigned Extensions** (re-enable after
-   each Safari restart for a locally-built, unsigned extension).
-4. **Settings → Extensions** → enable **PT Gold**, then grant it access to
-   `phantasytour.com`.
+### 🧭 Board — browse active topics
+The **Board** tab lists the forum's currently-active threads.
 
-Notes for Safari:
-- Distributing the extension to *other* people (vs. running it on your own Mac)
-  additionally requires an **Apple Developer account** ($99/yr) and
-  notarization. Running it locally on your own machine does not.
-- The toolbar **badge count** has limited support in Safari and may not appear;
-  the hide/moderation behavior itself works normally.
+- **Sort:** **Active** (most recent activity) or **Busiest** (most posts).
+- **Interest groups:** topics are auto-classified into chips (Music, Politics,
+  Sports, etc.) — click one to filter. (Classification is keyword-based, so
+  oddly-titled threads land in *Other*.)
+- **Expand a topic** to see a **thread snapshot** without leaving the panel:
+  total **posts / posters / time active**, **top posters** (bars), **most
+  quoted** users, and the **original post** preview — plus **Open thread ↗**.
 
-## Usage
+### 🛡️ Moderate — hide content on the forum
+The **Moderate** tab is your personal filter. As you browse the forum it hides
+anything matching your rules.
 
-- **Blocked Handles** — type a username (the `@` is optional). Hides their
-  posts/threads *and* any post that quotes them.
-- **Blocked Keywords** — type a word or phrase. Case-insensitive substring
-  match against thread titles and post bodies.
-- **Master switch** — turn all moderation on/off without losing your lists.
-- Remove an entry with the `×` on its chip. Everything saves instantly and
-  syncs across your signed-in Chrome sessions.
+- **Enable hiding**, then add **Blocked handles** and/or **Blocked keywords**.
+- It hides matching **threads**, **posts**, and **posts that quote a blocked
+  handle** (quoted nests) — applied live as the Knockout-rendered pages update.
+
+### 📊 Snapshot — per-thread analytics (on the forum)
+On any thread page, PT Gold injects a **Snapshot** panel above the posts:
+
+- **Posts · posters · time active · quotes** at a glance.
+- **Top posters** (bars) and **Most quoted** posts (click to scroll to one).
+- A **collapse caret** on every post, and a quote-count chip on quoted posts.
+- **Scan all pages** upgrades the stats from the current page to the whole thread.
+- Toggle it (and its pieces) in Settings → **Snapshot**.
+
+### 🎨 Skins — reskin the forum (and the panel)
+Settings → **Site appearance**: **Original**, **Dark**, or **Light**.
+
+- **Dark** gives the whole forum a charcoal theme with separated, neon-accented
+  post cards. **Light** is a clean grey/white theme (no green/yellow).
+- The chosen skin also themes the extension's own side panel.
+- Applies live to open forum tabs.
+
+---
+
+## Privacy
+
+- **No credentials stored.** Background checks use the forum's *public* search
+  API; nothing reads or saves your login token.
+- **Local only.** Your handle, keywords, and inbox live in `chrome.storage` on
+  your machine. Nothing is sent anywhere except normal requests to the forum
+  itself.
+- Background polling runs only while your browser is open, on the interval you
+  set, scoped to your watch terms.
+
+---
 
 ## Files
 
-- `manifest.json` — MV3 config (scoped to the Phish band path)
-- `content.js` / `content.css` — moderation engine + the hide rule
-- `popup.html` / `popup.css` / `popup.js` — the gold dial UI
-- `background.js` — toolbar badge counter
-- `make_icons.py` — regenerates the crown icons (dev only; not loaded)
+- `manifest.json` — MV3 config (side panel, alarms, notifications, host access)
+- `background.js` — search poller, inbox store, notifications, toolbar badge
+- `dashboard.html/css/js` — the side-panel app (Mentions · Board · Moderate · Settings)
+- `theme.css` — shared design tokens (incl. the light theme)
+- `content.js` / `content.css` — moderation (hide blocked content)
+- `remix.js` / `remix.css` — the on-thread **Snapshot** panel
+- `harvest.js` — deep-link "jump to exact post" on thread pages
+- `discover.js` — learns the forum's API endpoints at runtime
+- `skin.js` / `skin.css` — forum dark/light skins
+- `docs/` — README screenshots (placeholder content)
