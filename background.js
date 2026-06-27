@@ -1,18 +1,15 @@
 /* =========================================================================
  * PT Gold — background service worker
  *
- *  • Receives harvested hits (from harvest.js) and discovered endpoints
- *    (from discover.js via harvest.js), stores them.
  *  • Maintains the Inbox (chrome.storage.local) + toolbar unread badge.
  *  • Fires desktop notifications for new mentions/keywords.
- *  • On a chrome.alarms timer, replays discovered endpoints with your cookies
- *    to find new hits even when no forum tab is open.
+ *  • On a chrome.alarms timer, queries the forum's public search API to find
+ *    new mentions even when no forum tab is open.
  * ========================================================================= */
 "use strict";
 
 const SETTINGS_KEY = "ptgold_settings";
 const INBOX_KEY = "ptg_inbox";
-const ENDPOINTS_KEY = "ptg_endpoints";
 const INBOX_CAP = 500;
 const ALARM = "ptg-poll";
 
@@ -87,35 +84,17 @@ chrome.notifications.onClicked.addListener((nid) => {
   }
 });
 
-/* ---------- endpoint capture ---------- */
-async function storeEndpoint(ep) {
-  if (!ep || !ep.template) return;
-  const eps = await getLocal(ENDPOINTS_KEY, {});
-  const key = ep.method + " " + ep.template;
-  // keep the first seen example of each template (with its shape + a sample search)
-  if (!eps[key]) {
-    eps[key] = { ...ep, seenAt: Date.now() };
-    await setLocal(ENDPOINTS_KEY, eps);
-  }
-}
-
 /* ---------- background polling (tab-free) ---------- */
-// Forum-wide search poll: queries the forum's OWN search API for your handle
-// and each watch-keyword, using the browser's existing cookies. No tab needed,
-// and no token is stored here — credentials:'include' reuses your live session.
+// Forum-wide search poll: queries the forum's OWN public search API for your
+// handle and each watch-keyword. No tab needed, no token stored. Endpoints are
+// the two confirmed public search routes — posts first (mentions in post
+// bodies), then threads (mentions in thread titles).
 const ORIGIN = "https://www.phantasytour.com";
 const SEARCH_BASE = ORIGIN + "/api/bands/1"; // band 1 = Phish (this extension's scope)
 const LOOKBACK_DAYS = 60;
 
-async function searchEndpoints() {
-  // Query BOTH confirmed endpoints: posts (mentions in post bodies — the
-  // important one) AND threads (mentions in thread titles). Posts first.
-  const known = [SEARCH_BASE + "/posts/search", SEARCH_BASE + "/threads/search"];
-  const eps = await getLocal(ENDPOINTS_KEY, {});
-  const found = Object.values(eps)
-    .filter((e) => e.method === "GET" && /search/i.test(e.template || ""))
-    .map((e) => ORIGIN + String(e.path || "").replace(/\?.*$/, ""));
-  return [...new Set([...known, ...found])];
+function searchEndpoints() {
+  return [SEARCH_BASE + "/posts/search", SEARCH_BASE + "/threads/search"];
 }
 
 async function poll() {
@@ -130,7 +109,7 @@ async function poll() {
   const lookback = (settings.monitor && settings.monitor.lookbackDays) || LOOKBACK_DAYS;
   const now = new Date();
   const start = new Date(now.getTime() - lookback * 86400000);
-  const endpoints = await searchEndpoints();
+  const endpoints = searchEndpoints();
   const hits = [];
 
   for (const t of terms) {
@@ -255,8 +234,6 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (!msg) return false;
   if (msg.type === "ptg:newHits") {
     ingest(msg.hits);
-  } else if (msg.type === "ptg:endpoint") {
-    storeEndpoint(msg.endpoint);
   } else if (msg.type === "ptg:refreshBadge") {
     refreshBadge();
   } else if (msg.type === "ptg:pollNow") {

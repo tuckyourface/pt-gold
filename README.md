@@ -118,6 +118,5 @@ Settings → **Site appearance**: **Original**, **Dark**, or **Light**.
 - `content.js` / `content.css` — moderation (hide blocked content)
 - `remix.js` / `remix.css` — the on-thread **Snapshot** panel
 - `harvest.js` — deep-link "jump to exact post" on thread pages
-- `discover.js` — learns the forum's API endpoints at runtime
 - `skin.js` / `skin.css` — forum dark/light skins
 - `docs/` — README screenshots (placeholder content)
