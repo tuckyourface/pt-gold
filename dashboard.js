@@ -608,6 +608,15 @@
     settings = normalize(st);
     renderSettings();
     render();
+    // Pick up new mentions the moment the panel opens (not just on the timer).
+    if (settings.myHandle || (settings.watchKeywords || []).length) {
+      checkBtn.classList.add("spin");
+      status.textContent = "Checking…";
+      chrome.runtime.sendMessage({ type: "ptg:pollNow" }, () => {
+        void chrome.runtime.lastError;
+        checkBtn.classList.remove("spin");
+      });
+    }
   });
 
   function normalize(s) {

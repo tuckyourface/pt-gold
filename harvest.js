@@ -2,15 +2,29 @@
  * PT Gold — thread-page helper (isolated content script)
  *
  * Mentions are collected forum-wide by the background search poller, NOT by
- * scraping pages you browse. This script does one passive thing on thread
- * pages: honor "#ptgpost=<id>" deep-links from the dashboard — scroll to the
- * exact post (walking pagination if needed) and flash it. It never harvests
- * or sends mention data.
+ * scraping pages you browse (that caused duplicate alerts and was clunky).
+ * This script now does just two passive things on thread pages:
+ *   1. relay the forum's API endpoints captured by discover.js (MAIN world)
+ *   2. honor "#ptgpost=<id>" deep-links from the dashboard — scroll to the
+ *      exact post (walking pagination if needed) and flash it.
+ * It never harvests or sends mention hits.
  * ========================================================================= */
 (() => {
   "use strict";
 
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  /* ---- relay discovered endpoints from the MAIN world ---- */
+  window.addEventListener("message", (e) => {
+    if (e.source !== window) return;
+    const d = e.data;
+    if (!d || d.source !== "ptgold-discover" || !d.endpoint) return;
+    try {
+      chrome.runtime.sendMessage({ type: "ptg:endpoint", endpoint: d.endpoint }, () =>
+        void chrome.runtime.lastError
+      );
+    } catch (_) {}
+  });
 
   /* ---- locate a post by its forum id ---- */
   function postId(el) {
