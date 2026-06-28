@@ -60,21 +60,46 @@ async function ingest(hits) {
   }
 }
 
+// Strip whole [quote=…]…[/quote] blocks (incl. nested + their quoted text),
+// leaving only the responder's own words — so the notification shows the
+// actual reply, not the quoted nest.
+function replyText(raw) {
+  let s = String(raw || ""), prev;
+  do {
+    prev = s;
+    s = s.replace(/\[quote[^\]]*\](?:(?!\[quote[^\]]*\]|\[\/quote\]).)*\[\/quote\]/gis, " ");
+  } while (s !== prev);
+  return s
+    .replace(/\[\/?[a-z][^\]]*\]/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&(nbsp|amp|lt|gt|quot|#39);/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function notify(fresh) {
-  const mentions = fresh.filter((h) => h.reason === "mention").length;
-  const keywords = fresh.filter((h) => h.reason === "keyword").length;
-  const parts = [];
-  if (mentions) parts.push(mentions + " mention" + (mentions === 1 ? "" : "s"));
-  if (keywords) parts.push(keywords + " keyword hit" + (keywords === 1 ? "" : "s"));
-  const title = "PT Gold — " + parts.join(" · ");
   const first = fresh[0];
-  const body = (first.author ? first.author + ": " : "") + (first.snippet || first.threadTitle || "");
+  const author = first.author || "Someone";
+  let verb = "mentioned you";
+  if (first.reason === "keyword") verb = 'matched "' + (first.keyword || "keyword") + '"';
+  else if (first.quoteType === "direct") verb = "quoted you";
+  else if (first.quoteType === "nested") verb = "quoted you (nested)";
+  else if (first.kind === "thread") verb = "named you in a thread title";
+
+  let title = author + " " + verb;
+  if (fresh.length > 1) title += "  +" + (fresh.length - 1) + " more";
+
+  // body = the actual reply (quotes stripped); fall back to the thread title
+  const reply = replyText(first.body);
+  const message = reply || ("in “" + (first.threadTitle || "a thread") + "”");
+
   const nid = "ptg-" + first.key;
   chrome.notifications.create(nid, {
     type: "basic",
     iconUrl: chrome.runtime.getURL("icons/icon128.png"),
-    title,
-    message: body.slice(0, 180),
+    title: title.slice(0, 110),
+    message: message.slice(0, 220),
+    contextMessage: first.threadTitle ? "in “" + first.threadTitle + "”" : undefined,
     priority: 1,
   });
 }

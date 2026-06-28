@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "PT Gold",
-  "version": "1.1.2",
+  "version": "1.1.3",
   "description": "Certified moderator for the Phish forum on Phantasy Tour. Hide threads, posts, and quoted nests by keyword or user handle.",
   "permissions": ["storage", "alarms", "notifications", "sidePanel"],
   "host_permissions": ["https://www.phantasytour.com/*"],
