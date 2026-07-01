@@ -9,9 +9,9 @@ Everything runs locally in your browser. The forum's public search/topic APIs
 power the data — **no account credentials are ever stored**, and the mention
 search even works while you're logged out.
 
-| Mentions | Board | Settings |
+| Mentions | Board | Thread view |
 |---|---|---|
-| ![Mentions](docs/mentions.png) | ![Board](docs/board.png) | ![Settings](docs/settings.png) |
+| ![Mentions](docs/mentions.png) | ![Board](docs/board.png) | ![Thread view](docs/thread.png) |
 
 > Screenshots use placeholder (lorem ipsum) content.
 
@@ -59,16 +59,21 @@ open and even when you're logged out.
   plus a desktop-notification master and a toolbar unread badge. Set the
   background **Check every** interval and **Look back** window there too.
 
-### 🧭 Board — browse active topics
-The **Board** tab lists the forum's currently-active threads.
+### 🧭 Board — browse & read the forum in-panel
+The **Board** tab is a full forum browser + reader — no need to leave the panel.
 
-- **Sort:** **Active** (most recent activity) or **Busiest** (most posts).
-- **Interest groups:** topics are auto-classified into chips (Music, Politics,
-  Sports, etc.) — click one to filter. (Classification is keyword-based, so
-  oddly-titled threads land in *Other*.)
-- **Expand a topic** to see a **thread snapshot** without leaving the panel:
-  total **posts / posters / time active**, **top posters** (bars), **most
-  quoted** users, and the **original post** preview — plus **Open thread ↗**.
+- **Table or card view** (toggle), with a **Subject · Author · Posts · Last**
+  layout. Sort by **Active** / **Busiest** (or click the column headers).
+- **Filter:** a **keyword search** (subject + author) and auto-classified
+  **interest-group** chips (Phish, Jam, Politics, Sports, Music, Other).
+- **Organize threads:** **★ save** to *My Threads*, **📌 pin** to the top, or
+  **⊘ hide** — all persisted locally. **Load more** pages past the first 60.
+- **Read inline:** click a thread to expand a **lazy reader** — 30 posts at a
+  time, oldest→newest, with the same depth-colored nested-quote rendering as
+  Mentions. Toggle **oldest/newest first** and **▴ Collapse**.
+- **Thread View:** open any thread (**⤢**) in a **dedicated full-panel view**
+  with **Back**, order toggle, **search-within-thread**, paged loading, and
+  **Reply** (native in-panel posting is in progress). Correct **UTC** post times.
 
 ### 🛡️ Moderate — hide content on the forum
 The **Moderate** tab is your personal filter. As you browse the forum it hides
