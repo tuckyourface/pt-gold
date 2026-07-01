@@ -251,7 +251,12 @@ function parseSearch(json, t, out) {
     let url = threadId
       ? ORIGIN + "/bands/phish/threads/" + threadId + (slug ? "/" + slug : "")
       : ORIGIN + "/bands/phish/";
-    if (isPost && postId) url += "#ptgpost=" + postId; // deep-link to the exact post
+    if (isPost && postId) {
+      // deep-link to the exact post: id + a distinctive text fragment (the DOM
+      // may not expose the post id, so the content script can match on text)
+      const frag = (replyText(bodyRaw) || cleanBody(bodyRaw)).slice(0, 60).trim();
+      url += "#ptgpost=" + postId + (frag ? "&ptgtext=" + encodeURIComponent(frag) : "");
+    }
     const id = (threadId || "t") + "-" + (postId || "thread");
 
     out.push({
@@ -262,6 +267,7 @@ function parseSearch(json, t, out) {
       quoteType: t.reason === "mention" ? quoteTypeOf(bodyRaw, t.term) : null,
       keyword: t.keyword || null,
       author,
+      authorId: pick(item, ["authorId"]) || null,
       threadId,
       threadTitle: subject,
       snippet,
@@ -276,10 +282,131 @@ function parseSearch(json, t, out) {
   return n;
 }
 
+/* ---------- posting (runs inside a forum tab so it's same-origin) ---------- */
+function waitForComplete(tabId) {
+  return new Promise((resolve) => {
+    const check = () => chrome.tabs.get(tabId, (t) => {
+      if (chrome.runtime.lastError || !t) return resolve();
+      if (t.status === "complete") resolve(); else setTimeout(check, 200);
+    });
+    check();
+  });
+}
+async function postViaTab(url, payload) {
+  try {
+    const tabs = await chrome.tabs.query({ url: "https://www.phantasytour.com/*" });
+    let tab = tabs[0], created = false;
+    if (!tab) {
+      tab = await chrome.tabs.create({ url: "https://www.phantasytour.com/bands/phish/", active: false });
+      created = true;
+      await waitForComplete(tab.id);
+    }
+    const results = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      world: "MAIN",
+      args: [url, payload],
+      func: async (u, p) => {
+        try {
+          // The forum sends the ASP.NET anti-forgery token (PT.antiforgeryToken)
+          // in a RequestVerificationToken header. Read it from the global, or
+          // scrape it from the inline page script if the global isn't populated.
+          let token = (window.PT && window.PT.antiforgeryToken) || "";
+          let src = token ? "win" : "";
+          if (!token) {
+            const html = document.documentElement ? document.documentElement.innerHTML : "";
+            const m = html.match(/antiforgeryToken['"]?\s*[:=]\s*['"]([^'"]{10,})['"]/i);
+            if (m) { token = m[1]; src = "scrape"; }
+          }
+          const headers = { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" };
+          if (token) headers["RequestVerificationToken"] = token;
+          // redirect:"manual" → a logged-out POST that 302s to the login page comes
+          // back as an opaque redirect (status 0) instead of silently "succeeding".
+          const r = await fetch(u, { method: "POST", credentials: "include", headers, body: JSON.stringify(p), redirect: "manual" });
+          if (r.type === "opaqueredirect" || (r.status === 0 && r.type !== "basic")) {
+            return { ok: false, status: 401, text: "redirect-to-login", token: token ? src : "missing", auth: false };
+          }
+          let text = ""; try { text = (await r.text()).slice(0, 400); } catch (e) {}
+          // a real post returns JSON; an HTML body (login/error page) means not signed in
+          const looksHtml = /^\s*</.test(text) || /Authorization has been denied|log ?in|sign ?in/i.test(text);
+          if (r.ok && looksHtml) return { ok: false, status: 401, text: "not-authenticated", token: token ? src : "missing", auth: false };
+          return { ok: r.ok, status: r.status, text, token: token ? src : "missing", auth: r.status !== 401 && r.status !== 403 };
+        } catch (e) { return { ok: false, status: 0, text: String(e) }; }
+      },
+    });
+    if (created) { try { await chrome.tabs.remove(tab.id); } catch (e) {} }
+    return (results && results[0] && results[0].result) || { ok: false, status: 0, text: "no result" };
+  } catch (e) {
+    return { ok: false, status: 0, text: String(e) };
+  }
+}
+
+// Same-origin authenticated GET, routed through a forum tab so it carries the
+// session cookies + correct Origin (extension-origin requests can be rejected).
+// Used for the user's personalized lists (e.g. /api/tags/2/my-topics).
+async function getViaTab(url) {
+  try {
+    const tabs = await chrome.tabs.query({ url: "https://www.phantasytour.com/*" });
+    let tab = tabs[0], created = false;
+    if (!tab) {
+      tab = await chrome.tabs.create({ url: "https://www.phantasytour.com/bands/phish/", active: false });
+      created = true;
+      await waitForComplete(tab.id);
+    }
+    const results = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      world: "MAIN",
+      args: [url],
+      func: async (u) => {
+        try {
+          const r = await fetch(u, { method: "GET", credentials: "include", headers: { "X-Requested-With": "XMLHttpRequest", Accept: "application/json, */*" } });
+          let data = null; try { data = await r.json(); } catch (e) {}
+          return { ok: r.ok, status: r.status, data };
+        } catch (e) { return { ok: false, status: 0, data: null, error: String(e) }; }
+      },
+    });
+    if (created) { try { await chrome.tabs.remove(tab.id); } catch (e) {} }
+    return (results && results[0] && results[0].result) || { ok: false, status: 0, data: null };
+  } catch (e) {
+    return { ok: false, status: 0, data: null, error: String(e) };
+  }
+}
+
+// Giphy search on behalf of a content script (which can't reach api.giphy.com
+// cross-origin). Reads the user's key from settings. Returns { ok, items[] }.
+async function giphySearch(q) {
+  const s = await new Promise((r) => chrome.storage.sync.get("ptgold_settings", (o) => r(o.ptgold_settings || {})));
+  const key = (s.giphyKey || "").trim();
+  if (!key) return { ok: false, reason: "nokey" };
+  const base = q
+    ? `https://api.giphy.com/v1/gifs/search?api_key=${encodeURIComponent(key)}&q=${encodeURIComponent(q)}`
+    : `https://api.giphy.com/v1/gifs/trending?api_key=${encodeURIComponent(key)}`;
+  try {
+    const r = await fetch(`${base}&limit=24&rating=pg-13&bundle=fixed_width_small`);
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || (j.meta && j.meta.status >= 400)) return { ok: false, reason: "error", status: (j.meta && j.meta.status) || r.status };
+    const items = (j.data || []).map((g) => {
+      const im = g.images || {};
+      const preview = (im.fixed_width_small || im.fixed_width_downsampled || im.preview_gif || {}).url;
+      const full = ((im.downsized_medium || im.original || im.downsized || {}).url || "").split("?")[0];
+      return { preview, full, title: g.title || "" };
+    }).filter((x) => x.preview && x.full);
+    return { ok: true, items };
+  } catch (e) { return { ok: false, reason: "network" }; }
+}
+
 /* ---------- messages ---------- */
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (!msg) return false;
-  if (msg.type === "ptg:newHits") {
+  if (msg.type === "ptg:post") {
+    postViaTab(msg.url, msg.payload).then(sendResponse);
+    return true; // async
+  } else if (msg.type === "ptg:get") {
+    getViaTab(msg.url).then(sendResponse);
+    return true; // async
+  } else if (msg.type === "ptg:giphy") {
+    giphySearch(msg.q || "").then(sendResponse);
+    return true; // async
+  } else if (msg.type === "ptg:newHits") {
     ingest(msg.hits);
   } else if (msg.type === "ptg:endpoint") {
     storeEndpoint(msg.endpoint);

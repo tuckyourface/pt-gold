@@ -73,16 +73,27 @@
   }
 
   /* ---- deep-link: scroll to an exact post (#ptgpost=<id>) ---- */
-  function jumpHashId() {
-    const m = (location.hash || "").match(/ptgpost=(\d+)/);
-    return m ? m[1] : null;
+  function jumpHash() {
+    const h = location.hash || "";
+    const pid = (h.match(/ptgpost=(\d+)/) || [])[1] || null;
+    let text = (h.match(/ptgtext=([^&]+)/) || [])[1] || "";
+    try { text = decodeURIComponent(text); } catch (_) {}
+    return { pid, text: text.toLowerCase().replace(/\s+/g, " ").trim() };
   }
   let jumping = false;
-  async function jumpToPostId(pid) {
+  async function jumpTo(pid, text) {
     if (jumping) return;
     jumping = true;
     try {
-      const find = () => [...document.querySelectorAll(".post-listing .post")].find((el) => postId(el) === pid);
+      // match by post id, OR by a distinctive text fragment (DOM may lack the id)
+      const find = () => [...document.querySelectorAll(".post-listing .post")].find((el) => {
+        if (pid && postId(el) === pid) return true;
+        if (text) {
+          const body = el.querySelector(".post_body_container");
+          if (body && (body.textContent || "").toLowerCase().replace(/\s+/g, " ").indexOf(text) !== -1) return true;
+        }
+        return false;
+      });
       let el = find();
       if (!el) {
         const max = maxPage();
@@ -102,13 +113,13 @@
     }
   }
   async function maybeJump() {
-    const pid = jumpHashId();
-    if (!pid) return;
+    const { pid, text } = jumpHash();
+    if (!pid && !text) return;
     for (let i = 0; i < 40; i++) {
       if (document.querySelector(".post-listing .post")) break;
       await sleep(150);
     }
-    jumpToPostId(pid);
+    jumpTo(pid, text);
   }
 
   window.addEventListener("hashchange", maybeJump);

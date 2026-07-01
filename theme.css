@@ -44,6 +44,30 @@
   --accent-line: rgba(168,130,63,0.42);
 }
 
+/* "Original" theme — a clean nod to Phantasy Tour: white paper, forest green as
+   the interactive color, a gold highlighter, near-black text. Extension only —
+   it never touches the forum. Driven by <html data-theme="pt">. */
+:root[data-theme="pt"] {
+  --bg:        #ffffff;            /* white */
+  --surface:   #f6f8f3;            /* faint green-white panel */
+  --surface-2: #eef1e9;
+  --surface-3: #e3e7dc;
+  --border:    #d8ddcf;
+  --border-2:  #e8ebe1;
+  --text:      #13171b;           /* near-black */
+  --text-dim:  #414852;
+  --text-mute: #6f7883;
+  --accent:    #2e7d32;           /* green */
+  --accent-2:  #3f9142;
+  --accent-soft: rgba(46,125,50,0.12);
+  --accent-line: rgba(46,125,50,0.34);
+  --green:     #2e7d32;
+  --danger:    #c0392b;
+  --hi:        #e0a400;           /* gold highlighter */
+  --hi-soft:   rgba(224,164,0,0.30);
+  --hi-ink:    #6b4e00;
+}
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: var(--font); color: var(--text); background: var(--bg); -webkit-font-smoothing: antialiased; }
 
@@ -65,6 +89,11 @@ body { font-family: var(--font); color: var(--text); background: var(--bg); -web
 }
 .brand-name { font-size: 13px; font-weight: 600; letter-spacing: 2.5px; color: var(--text); }
 .brand-name .lt { color: var(--accent); }
+/* PT theme: yellow-on-green brand mark, like the classic logo */
+:root[data-theme="pt"] .brand-mark {
+  color: var(--hi);
+  background: linear-gradient(150deg, var(--accent-2), var(--accent) 75%, #38601e);
+}
 
 /* ---- typography helpers ---- */
 .h-label { font-size: 11px; font-weight: 600; letter-spacing: 0.4px; color: var(--text); }

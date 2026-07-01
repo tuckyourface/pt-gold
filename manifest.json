@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
   "name": "PT Gold",
-  "version": "1.1.4",
+  "version": "1.2.0",
   "description": "Certified moderator for the Phish forum on Phantasy Tour. Hide threads, posts, and quoted nests by keyword or user handle.",
-  "permissions": ["storage", "alarms", "notifications", "sidePanel"],
-  "host_permissions": ["https://www.phantasytour.com/*"],
+  "permissions": ["storage", "alarms", "notifications", "sidePanel", "scripting"],
+  "host_permissions": ["https://www.phantasytour.com/*", "https://api.giphy.com/*"],
   "action": {
     "default_title": "PT Gold — open panel",
     "default_icon": {
@@ -23,8 +23,8 @@
   "content_scripts": [
     {
       "matches": ["https://www.phantasytour.com/bands/phish/*"],
-      "js": ["skin.js", "content.js", "harvest.js"],
-      "css": ["content.css", "skin.css"],
+      "js": ["content.js", "harvest.js", "imagify.js", "compose.js"],
+      "css": ["content.css"],
       "run_at": "document_start"
     },
     {

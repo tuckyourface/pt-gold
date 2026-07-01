@@ -24,6 +24,7 @@
   <nav class="db-tabs">
     <button class="db-tab on" data-view="feed">Mentions</button>
     <button class="db-tab" data-view="board">Board</button>
+    <button class="db-tab" data-view="search">Search</button>
     <button class="db-tab" data-view="moderate">Moderate</button>
     <button class="db-tab" data-view="settings">Settings</button>
   </nav>
@@ -69,8 +70,10 @@
         <button class="on" data-sort="active">Active</button>
         <button data-sort="busiest">Busiest</button>
         <button data-sort="saved">★ Saved</button>
+        <button data-sort="mine" title="Threads you follow on your PT account">My Threads</button>
       </div>
       <div class="grow"></div>
+      <button id="boardNew" class="btn btn-sm btn-accent" title="Start a new thread">＋ New</button>
       <button id="boardView" class="btn btn-sm btn-ghost" title="Switch table / card view">⊞</button>
       <button id="boardRefresh" class="btn btn-sm" title="Refresh">↻</button>
     </div>
@@ -86,8 +89,28 @@
       <span class="bh-author">Author</span>
       <span class="bh-posts" data-sort="busiest">Posts</span>
       <span class="bh-last" data-sort="active">Last</span>
+      <span></span>
     </div>
     <main id="boardList" class="feed"></main>
+  </section>
+
+  <!-- ====================== SEARCH ====================== -->
+  <section id="view-search" class="view" hidden>
+    <div class="search-form">
+      <div class="seg" id="sqType">
+        <button class="on" data-type="posts">Posts</button>
+        <button data-type="threads">Threads</button>
+      </div>
+      <div class="field"><span class="pre">⌕</span><input id="sqKeyword" type="text" placeholder="Keyword or phrase…" autocomplete="off" spellcheck="false" /></div>
+      <div class="field"><span class="pre">@</span><input id="sqAuthor" type="text" placeholder="Author (optional)" autocomplete="off" spellcheck="false" /></div>
+      <div class="search-dates">
+        <label>From <input type="date" id="sqFrom" /></label>
+        <label>To <input type="date" id="sqTo" /></label>
+      </div>
+      <button id="sqGo" class="btn btn-sm btn-accent">Search</button>
+    </div>
+    <div class="feed-meta"><span id="sqStatus" class="mute2">Enter a keyword and hit Search.</span></div>
+    <main id="sqResults" class="feed"></main>
   </section>
 
   <!-- ====================== MODERATE ====================== -->
@@ -116,11 +139,26 @@
   <section id="view-settings" class="view" hidden>
     <div class="set-scroll">
       <div class="set-group">
-        <div class="set-group-head"><span class="h-label">Site appearance</span><span class="h-eyebrow">forum skin</span></div>
+        <div class="set-group-head"><span class="h-label">Panel theme</span><span class="h-eyebrow">extension only</span></div>
         <div class="seg seg-full" id="skinSeg">
           <button data-skin="original" class="on">Original</button>
           <button data-skin="dark">Dark</button>
           <button data-skin="light">Light</button>
+        </div>
+        <p class="set-hint">Styles the PT&nbsp;Gold panel. Original is a nod to the classic PT green &amp; gold. The forum itself is never restyled.</p>
+      </div>
+
+      <hr class="sep" />
+
+      <div class="set-group">
+        <div class="set-group-head"><span class="h-label">Images &amp; GIFs</span><span class="h-eyebrow">embedding</span></div>
+        <div class="opt"><span>Embed images on the forum</span>
+          <label class="sw"><input type="checkbox" id="embed-images" /><span class="slot"><span class="knob"></span></span></label></div>
+        <p class="set-hint">The forum shows image links as raw text. With this on, PT&nbsp;Gold renders direct image &amp; GIF URLs inline as you browse the actual site. Only you see them — other users are unaffected. (Images always render inside PT&nbsp;Gold's own reader.)</p>
+        <div class="set-sub">
+          <span class="set-sublabel">Giphy API key <span class="mute2">— for GIF search</span></span>
+          <form class="field" id="giphyForm"><span class="pre">🔑</span><input type="text" id="giphyKey" placeholder="paste a free Giphy API key" autocomplete="off" spellcheck="false" /></form>
+          <p class="set-hint">Optional. Create a free key at the <a class="rd-link" id="giphyLink" href="#">Giphy developer dashboard</a> (Tenor stopped issuing keys in Jan&nbsp;2026). Without a key, the composer still has the emoji picker and a paste-a-GIF-URL box — both work with no signup.</p>
         </div>
       </div>
 
@@ -207,6 +245,58 @@
     </div>
     <main id="tvPosts" class="tv-posts"><div class="tv-inner"></div></main>
     <footer id="tvFoot" class="tv-foot"></footer>
+    <div id="tvCompose" class="composer" hidden>
+      <div class="composer-head"><span id="tvcTitle">Reply</span><button id="tvcCancel" class="btn btn-icon btn-ghost" title="Close">✕</button></div>
+      <div id="tvcBody" class="rce" data-ph="Write a reply…"></div>
+      <div class="composer-actions"><span id="tvcStatus" class="mute2"></span><span class="grow"></span><button id="tvcSend" class="btn btn-sm btn-accent">Send reply</button></div>
+    </div>
+  </div>
+
+  <!-- ====================== NEW THREAD (overlay) ====================== -->
+  <div id="newThread" class="tview" hidden>
+    <header class="tv-head">
+      <button id="ntCancel" class="btn btn-sm btn-ghost" title="Cancel">← Cancel</button>
+      <span class="tv-title">New thread</span>
+    </header>
+    <div class="nt-body">
+      <input id="ntSubject" class="nt-subject" type="text" placeholder="Subject" autocomplete="off" />
+      <textarea id="ntText" class="nt-text" placeholder="Write your post — BBCode supported"></textarea>
+      <div class="composer-actions"><span id="ntStatus" class="mute2"></span><span class="grow"></span><button id="ntSend" class="btn btn-sm btn-accent">Post thread</button></div>
+    </div>
+  </div>
+
+  <!-- ====================== PROFILE (overlay) ====================== -->
+  <div id="profileView" class="tview" hidden>
+    <header class="tv-head">
+      <button id="pvBack" class="btn btn-sm btn-ghost" title="Back">← Back</button>
+      <span id="pvTitle" class="tv-title">@user</span>
+      <button id="pvOpen" class="btn btn-icon btn-ghost" title="Open profile in browser">↗</button>
+    </header>
+    <div class="pv-body">
+      <div class="pv-stats" id="pvStats"></div>
+      <div class="pv-section">
+        <div class="pv-h">Posts / day <span class="mute2">(last 14 days)</span><span class="grow"></span><span id="pvChartAvg" class="pv-h-note mute2"></span></div>
+        <div class="pv-chartwrap">
+          <div class="pv-yaxis"><span id="pvChartMax">0</span><span>0</span></div>
+          <div class="pv-chart" id="pvChart"></div>
+        </div>
+        <div class="pv-xaxis"><span>14d ago</span><span>today</span></div>
+      </div>
+      <div class="pv-section">
+        <div class="pv-h">Threads / month <span class="mute2">(last 12 months)</span></div>
+        <div class="pv-chartwrap">
+          <div class="pv-yaxis"><span id="pvTMax">0</span><span>0</span></div>
+          <div class="pv-chart" id="pvTChart"></div>
+        </div>
+        <div class="pv-xaxis"><span>12mo ago</span><span>today</span></div>
+      </div>
+      <div class="seg seg-full" id="pvTabs">
+        <button data-tab="posts" class="on">Posts</button>
+        <button data-tab="threads">Threads</button>
+      </div>
+      <div id="pvPosts" class="pv-list"></div>
+      <div id="pvThreads" class="pv-list" hidden></div>
+    </div>
   </div>
 
   <script src="dashboard.js"></script>
