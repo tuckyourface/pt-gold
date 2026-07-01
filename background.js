@@ -199,7 +199,8 @@ function cleanBody(s) {
     .trim();
 }
 function parseTs(v) {
-  const t = v ? Date.parse(v) : NaN;
+  // Server timestamps are UTC but sent without a 'Z' — parse them as UTC.
+  const t = v ? Date.parse(/([zZ]|[+-]\d\d:?\d\d)$/.test(v) ? v : v + "Z") : NaN;
   return isNaN(t) ? Date.now() : t;
 }
 

@@ -68,12 +68,25 @@
       <div class="seg" id="boardSort">
         <button class="on" data-sort="active">Active</button>
         <button data-sort="busiest">Busiest</button>
+        <button data-sort="saved">★ Saved</button>
       </div>
       <div class="grow"></div>
+      <button id="boardView" class="btn btn-sm btn-ghost" title="Switch table / card view">⊞</button>
       <button id="boardRefresh" class="btn btn-sm" title="Refresh">↻</button>
     </div>
     <div class="board-groups" id="boardGroups"></div>
+    <div class="feed-search">
+      <span class="search-ic">⌕</span>
+      <input id="boardSearch" type="text" placeholder="Filter threads by keyword or author…" autocomplete="off" spellcheck="false" />
+      <button id="boardSearchClear" class="search-clear" hidden aria-label="Clear">×</button>
+    </div>
     <div class="feed-meta"><span id="boardStatus" class="mute2">—</span></div>
+    <div class="board-thead" id="boardHead">
+      <span class="bh-subj">Subject</span>
+      <span class="bh-author">Author</span>
+      <span class="bh-posts" data-sort="busiest">Posts</span>
+      <span class="bh-last" data-sort="active">Last</span>
+    </div>
     <main id="boardList" class="feed"></main>
   </section>
 
@@ -173,27 +186,28 @@
         </div>
         <p class="set-hint">Runs while your browser is open — no forum tab required. Search is public, so it works even when you’re logged out.</p>
       </div>
-
-      <hr class="sep" />
-
-      <div class="set-group">
-        <div class="set-group-head"><span class="h-label">Snapshot</span><span class="h-eyebrow">thread analysis</span></div>
-        <div class="opt"><span>Enable on thread pages</span>
-          <label class="sw"><input type="checkbox" id="rx-enabled" /><span class="slot"><span class="knob"></span></span></label></div>
-        <div class="opt"><span class="opt-sub">Quote-count chips</span>
-          <label class="sw"><input type="checkbox" id="rx-badges" /><span class="slot"><span class="knob"></span></span></label></div>
-        <div class="opt"><span class="opt-sub">Stats panel</span>
-          <label class="sw"><input type="checkbox" id="rx-panel" /><span class="slot"><span class="knob"></span></span></label></div>
-        <div class="opt"><span>Rows in lists</span>
-          <div class="stepper-inline">
-            <button type="button" id="rx-dec" aria-label="Fewer">–</button>
-            <span id="rx-topn">5</span>
-            <button type="button" id="rx-inc" aria-label="More">+</button>
-          </div>
-        </div>
-      </div>
     </div>
   </section>
+
+  <!-- ====================== THREAD VIEW (overlay) ====================== -->
+  <div id="threadView" class="tview" hidden>
+    <header class="tv-head">
+      <button id="tvBack" class="btn btn-sm btn-ghost" title="Back to board">← Back</button>
+      <span id="tvTitle" class="tv-title">Thread</span>
+      <button id="tvOpen" class="btn btn-icon btn-ghost" title="Open in browser">↗</button>
+    </header>
+    <div class="tv-bar">
+      <button id="tvOrder" class="btn btn-sm btn-ghost">Oldest first ⇅</button>
+      <div class="tv-search field">
+        <span class="pre">⌕</span>
+        <input id="tvSearch" type="text" placeholder="Search in thread…" autocomplete="off" spellcheck="false" />
+        <button id="tvSearchClear" class="search-clear" hidden aria-label="Clear">×</button>
+      </div>
+      <button id="tvReply" class="btn btn-sm btn-accent" title="Reply">Reply ↗</button>
+    </div>
+    <main id="tvPosts" class="tv-posts"><div class="tv-inner"></div></main>
+    <footer id="tvFoot" class="tv-foot"></footer>
+  </div>
 
   <script src="dashboard.js"></script>
 </body>

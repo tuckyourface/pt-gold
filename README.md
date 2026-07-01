@@ -78,15 +78,6 @@ anything matching your rules.
 - It hides matching **threads**, **posts**, and **posts that quote a blocked
   handle** (quoted nests) — applied live as the Knockout-rendered pages update.
 
-### 📊 Snapshot — per-thread analytics (on the forum)
-On any thread page, PT Gold injects a **Snapshot** panel above the posts:
-
-- **Posts · posters · time active · quotes** at a glance.
-- **Top posters** (bars) and **Most quoted** posts (click to scroll to one).
-- A **collapse caret** on every post, and a quote-count chip on quoted posts.
-- **Scan all pages** upgrades the stats from the current page to the whole thread.
-- Toggle it (and its pieces) in Settings → **Snapshot**.
-
 ### 🎨 Skins — reskin the forum (and the panel)
 Settings → **Site appearance**: **Original**, **Dark**, or **Light**.
 
@@ -116,7 +107,6 @@ Settings → **Site appearance**: **Original**, **Dark**, or **Light**.
 - `dashboard.html/css/js` — the side-panel app (Mentions · Board · Moderate · Settings)
 - `theme.css` — shared design tokens (incl. the light theme)
 - `content.js` / `content.css` — moderation (hide blocked content)
-- `remix.js` / `remix.css` — the on-thread **Snapshot** panel
 - `harvest.js` — deep-link "jump to exact post" on thread pages
 - `discover.js` — learns the forum's API endpoints at runtime
 - `skin.js` / `skin.css` — forum dark/light skins

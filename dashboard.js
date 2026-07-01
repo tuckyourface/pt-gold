@@ -349,20 +349,72 @@
     return "other";
   }
   let boardTopics = [], boardSort = "active", boardGroup = "all", boardLoaded = false;
+  let boardSaved = [], boardPinned = new Set(), boardHidden = new Set(), boardShowHidden = false;
+  let boardViewMode = "table"; // "table" | "cards"
+  let boardQuery = "";
+  const matchesQuery = (t) => !boardQuery || (String(t.subject || "") + " " + String(t.authorUsername || "")).toLowerCase().includes(boardQuery);
 
-  async function loadBoard() {
+  // Server timestamps are UTC but sent without a 'Z' — parse them as UTC.
+  const parseUTC = (s) => Date.parse(s && !/([zZ]|[+-]\d\d:?\d\d)$/.test(s) ? s + "Z" : s);
+
+  function loadBoardState(cb) {
+    chrome.storage.local.get(["ptg_saved", "ptg_pinned", "ptg_hidden", "ptg_boardview"], (o) => {
+      boardSaved = Array.isArray(o.ptg_saved) ? o.ptg_saved : [];
+      boardPinned = new Set((o.ptg_pinned || []).map(String));
+      boardHidden = new Set((o.ptg_hidden || []).map(String));
+      if (o.ptg_boardview === "cards" || o.ptg_boardview === "table") boardViewMode = o.ptg_boardview;
+      cb && cb();
+    });
+  }
+  function saveBoardState() {
+    chrome.storage.local.set({ ptg_saved: boardSaved, ptg_pinned: [...boardPinned], ptg_hidden: [...boardHidden], ptg_boardview: boardViewMode });
+  }
+  const isSaved = (id) => boardSaved.some((s) => String(s.id) === String(id));
+  const slimTopic = (t) => ({ id: t.id, subject: t.subject, slug: t.slug, authorUsername: t.authorUsername, postCount: t.postCount, dateOfLastPost: t.dateOfLastPost, isSticky: t.isSticky });
+  function toggleSave(t) {
+    boardSaved = isSaved(t.id) ? boardSaved.filter((s) => String(s.id) !== String(t.id)) : [slimTopic(t), ...boardSaved];
+    saveBoardState(); renderBoard();
+  }
+  function togglePin(t) {
+    const id = String(t.id);
+    if (boardPinned.has(id)) boardPinned.delete(id); else boardPinned.add(id);
+    saveBoardState(); renderBoard();
+  }
+  function setHidden(id, on) { on ? boardHidden.add(String(id)) : boardHidden.delete(String(id)); saveBoardState(); renderBoard(); }
+  function iconBtn(txt, title, on, onClick) {
+    const b = document.createElement("button");
+    b.className = "trow-act" + (on ? " on" : "");
+    b.textContent = txt; b.title = title;
+    b.addEventListener("click", (e) => { e.stopPropagation(); onClick(); });
+    return b;
+  }
+
+  let boardPage = 1, boardHasMore = false, boardBusy = false;
+  async function loadBoard(reset = true) {
     boardLoaded = true;
+    if (boardBusy) return;
+    boardBusy = true;
+    if (reset) { boardPage = 1; boardTopics = []; }
     $("#boardStatus").textContent = "Loading…";
     try {
-      const res = await fetch(`https://www.phantasytour.com/api/tags/${TAG}/topics?page=1&pageSize=60&activeOnly=true`,
+      const res = await fetch(`https://www.phantasytour.com/api/tags/${TAG}/topics?page=${boardPage}&pageSize=60&activeOnly=true`,
         { credentials: "omit", headers: { "X-Requested-With": "XMLHttpRequest", Accept: "*/*" } });
       const j = await res.json();
-      boardTopics = Array.isArray(j) ? j : [];
+      const arr = Array.isArray(j) ? j : [];
+      if (reset) boardTopics = arr;
+      else {
+        const have = new Set(boardTopics.map((x) => String(x.id))); // dedupe on load-more
+        boardTopics = boardTopics.concat(arr.filter((x) => !have.has(String(x.id))));
+      }
+      boardHasMore = arr.length >= 60;
       renderGroups(); renderBoard();
     } catch (_) {
       $("#boardStatus").textContent = "Couldn’t load the board. Try Refresh.";
+    } finally {
+      boardBusy = false;
     }
   }
+  function loadMoreThreads() { boardPage++; loadBoard(false); }
   function renderGroups() {
     const counts = { all: boardTopics.length };
     boardTopics.forEach((t) => { const g = groupOf(t.subject); counts[g] = (counts[g] || 0) + 1; });
@@ -393,122 +445,331 @@
     const h = Math.floor(m / 60); if (h < 24) return h + "h " + (m % 60) + "m";
     const d = Math.floor(h / 24); return d + "d " + (h % 24) + "h";
   }
+  function agoShort(ts) {
+    if (!ts) return "—";
+    const s = Math.floor((Date.now() - ts) / 1000);
+    if (s < 3600) return Math.max(1, Math.floor(s / 60)) + "m";
+    if (s < 86400) return Math.floor(s / 3600) + "h";
+    if (s < 86400 * 30) return Math.floor(s / 86400) + "d";
+    return Math.floor(s / 86400 / 30) + "mo";
+  }
 
-  function topicRow(t) {
-    const wrap = document.createElement("div"); wrap.className = "titem";
-    const el = document.createElement("div"); el.className = "trow" + (t.isSticky ? " sticky" : "");
+  function topicRow(t) { return boardViewMode === "cards" ? topicRowCard(t) : topicRowTable(t); }
+
+  function topicActions(t, id, pinned, hidden, saved, url) {
+    const actions = document.createElement("div"); actions.className = "trow-actions";
+    actions.appendChild(iconBtn("📌", pinned ? "Unpin" : "Pin to top", pinned, () => togglePin(t)));
+    actions.appendChild(iconBtn(saved ? "★" : "☆", saved ? "Remove from Saved" : "Save to My Threads", saved, () => toggleSave(t)));
+    actions.appendChild(iconBtn(hidden ? "⊕" : "⊘", hidden ? "Unhide" : "Hide from board", false, () => setHidden(id, !hidden)));
+    actions.appendChild(iconBtn("⤢", "Open in thread view", false, () => openThreadView(t)));
+    actions.appendChild(iconBtn("↗", "Open in browser", false, () => chrome.tabs.create({ url })));
+    return actions;
+  }
+
+  // Table-style row: [dot + subject] · author · posts · last. Actions on hover.
+  function topicRowTable(t) {
+    const id = String(t.id);
+    const pinned = boardPinned.has(id), hidden = boardHidden.has(id), saved = isSaved(id);
     const g = groupOf(t.subject);
     const url = `${PT_ORIGIN}/bands/phish/threads/${t.id}/${t.slug || ""}`;
-    const grp = document.createElement("span"); grp.className = "trow-grp grp-" + g; grp.textContent = g;
-    const main = document.createElement("div"); main.className = "trow-main";
-    const subj = document.createElement("a"); subj.className = "trow-subj"; subj.textContent = t.subject || "(untitled)";
-    subj.href = url; subj.addEventListener("click", (e) => { e.stopPropagation(); e.preventDefault(); chrome.tabs.create({ url }); });
-    const meta = document.createElement("div"); meta.className = "trow-meta";
-    meta.textContent = `${t.authorUsername || "?"} · ${t.postCount} posts · last active ${agoCoarse(Date.parse(t.dateOfLastPost))}`;
-    main.append(subj, meta);
-    const chev = document.createElement("span"); chev.className = "trow-chev"; chev.textContent = "▸";
-    el.append(grp, main, chev);
-    el.addEventListener("click", () => toggleTopic(wrap, t));
+
+    const wrap = document.createElement("div"); wrap.className = "titem";
+    const el = document.createElement("div"); el.className = "trow" + (t.isSticky ? " sticky" : "") + (pinned ? " pinned" : "");
+
+    const subjCell = document.createElement("div"); subjCell.className = "trow-subj-cell";
+    const dot = document.createElement("span"); dot.className = "trow-dot grp-" + g; dot.title = g;
+    const subj = document.createElement("span"); subj.className = "trow-subj"; subj.textContent = t.subject || "(untitled)";
+    subjCell.append(dot, subj);
+    subjCell.addEventListener("click", () => toggleTopic(wrap, t));
+
+    const author = document.createElement("div"); author.className = "trow-col trow-author"; author.textContent = t.authorUsername || "?"; author.title = t.authorUsername || "";
+    const posts = document.createElement("div"); posts.className = "trow-col trow-posts"; posts.textContent = t.postCount;
+    const last = document.createElement("div"); last.className = "trow-col trow-last"; last.textContent = agoShort(parseUTC(t.dateOfLastPost)); last.title = agoCoarse(parseUTC(t.dateOfLastPost));
+
+    el.append(subjCell, author, posts, last, topicActions(t, id, pinned, hidden, saved, url));
     wrap.appendChild(el);
     return wrap;
   }
 
+  // Card-style row: group pill + title + a one-line meta. Actions on hover.
+  function topicRowCard(t) {
+    const id = String(t.id);
+    const pinned = boardPinned.has(id), hidden = boardHidden.has(id), saved = isSaved(id);
+    const g = groupOf(t.subject);
+    const url = `${PT_ORIGIN}/bands/phish/threads/${t.id}/${t.slug || ""}`;
+
+    const wrap = document.createElement("div"); wrap.className = "titem";
+    const el = document.createElement("div"); el.className = "trowc" + (t.isSticky ? " sticky" : "") + (pinned ? " pinned" : "");
+
+    const grp = document.createElement("span"); grp.className = "trow-grp grp-" + g; grp.textContent = g;
+    const main = document.createElement("div"); main.className = "trowc-main";
+    const subj = document.createElement("div"); subj.className = "trowc-subj"; subj.textContent = t.subject || "(untitled)";
+    const meta = document.createElement("div"); meta.className = "trowc-meta";
+    meta.textContent = `${t.authorUsername || "?"} · ${t.postCount} posts · last post ${agoCoarse(parseUTC(t.dateOfLastPost))}`;
+    main.append(subj, meta);
+    main.addEventListener("click", () => toggleTopic(wrap, t));
+
+    el.append(grp, main, topicActions(t, id, pinned, hidden, saved, url));
+    wrap.appendChild(el);
+    return wrap;
+  }
+
+  // Lazy thread reader: nothing is fetched until a thread is opened, then 30
+  // posts at a time (oldest/OP first → newest last), rendered with the same
+  // depth-colored nested-quote styling as the Mentions feed.
   function toggleTopic(wrap, t) {
-    if (wrap.classList.contains("open")) { wrap.classList.remove("open"); return; }
+    if (wrap.classList.contains("open")) { wrap.classList.remove("open"); return; } // collapse
     wrap.classList.add("open");
     if (!wrap.querySelector(".texp")) {
       const exp = document.createElement("div"); exp.className = "texp";
-      exp.innerHTML = '<div class="texp-msg">Loading snapshot…</div>';
+      exp._dir = "old";
+      exp._totalPages = Math.max(1, Math.ceil((t.postCount || 1) / 30));
+
+      const bar = document.createElement("div"); bar.className = "rd-bar";
+      const title = document.createElement("div"); title.className = "rd-btitle"; title.textContent = t.subject || "Thread";
+      const ctrls = document.createElement("div"); ctrls.className = "rd-ctrls";
+      const tv = document.createElement("button"); tv.className = "btn btn-sm btn-ghost";
+      tv.textContent = "⤢ Thread view"; tv.title = "Open the full-screen thread view (reply, search)";
+      tv.addEventListener("click", () => openThreadView(t));
+      const order = document.createElement("button"); order.className = "rd-order btn btn-sm btn-ghost";
+      order.textContent = "Oldest first ⇅"; order.title = "Toggle reading order";
+      order.addEventListener("click", () => {
+        exp._dir = exp._dir === "old" ? "new" : "old";
+        order.textContent = (exp._dir === "old" ? "Oldest first" : "Newest first") + " ⇅";
+        startReader(t, exp);
+      });
+      const spacer = document.createElement("span"); spacer.className = "grow";
+      const coll = document.createElement("button"); coll.className = "rd-collapse btn btn-sm btn-ghost";
+      coll.textContent = "▴ Collapse"; coll.title = "Collapse this thread";
+      coll.addEventListener("click", () => wrap.classList.remove("open"));
+      ctrls.append(tv, order, spacer, coll);
+      bar.append(title, ctrls);
+
+      const box = document.createElement("div"); box.className = "rd-posts";
+      exp.append(bar, box);
       wrap.appendChild(exp);
-      loadSnapshot(t, exp);
+      startReader(t, exp);
     }
   }
-  async function loadSnapshot(t, exp) {
-    try {
-      const maxPages = Math.min(6, Math.max(1, Math.ceil((t.postCount || 30) / 30)));
-      let posts = [];
-      for (let p = 1; p <= maxPages; p++) {
-        const r = await fetch(`${PT_ORIGIN}/api/bands/1/threads/${t.id}/posts?page=${p}&pageSize=30`,
-          { credentials: "omit", headers: { "X-Requested-With": "XMLHttpRequest", Accept: "*/*" } });
-        if (!r.ok) break;
-        const j = await r.json();
-        if (!Array.isArray(j) || !j.length) break;
-        posts = posts.concat(j);
-        if (j.length < 30) break;
+
+  function startReader(t, exp) {
+    const box = exp.querySelector(".rd-posts");
+    box.innerHTML = '<div class="texp-msg">Loading thread…</div>';
+    const foot = exp.querySelector(".rd-foot"); if (foot) foot.remove();
+    exp._count = 0;
+    exp._startPage = exp._dir === "new" ? exp._totalPages : 1;
+    exp._page = exp._startPage;
+    loadThreadPage(t, exp, exp._startPage);
+  }
+
+  function fmtDateTime(iso) {
+    const ms = parseUTC(iso); if (isNaN(ms)) return "";
+    const d = new Date(ms);
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) +
+      " · " + d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  }
+
+  // Render a post body in natural reading order: quoted blocks (nested,
+  // depth-colored, YOU-highlighted) then the poster's own text.
+  function renderPostBody(raw) {
+    const me = (settings.myHandle || "").toLowerCase();
+    const ctx = { term: settings.myHandle || "", meEl: null };
+    const root = parseBB(raw);
+    const wrap = document.createElement("div");
+    root.children.forEach((ch) => {
+      if (ch.type === "text") {
+        const txt = cleanText(ch.text);
+        if (txt) { const d = document.createElement("div"); d.className = "rd-text"; highlightInto(d, txt, ctx.term); wrap.appendChild(d); }
+      } else {
+        wrap.appendChild(renderQuoteEl(ch, 0, me, ctx));
       }
-      renderSnapshot(t, posts, exp);
-    } catch (_) { exp.innerHTML = '<div class="texp-msg">Couldn’t load this thread.</div>'; }
-  }
-  const tmetric = (v, l) => `<div class="texp-metric"><div class="texp-metric-v">${v}</div><div class="texp-metric-l">${l}</div></div>`;
-  function renderSnapshot(t, posts, exp) {
-    exp.textContent = "";
-    if (!posts.length) { exp.innerHTML = '<div class="texp-msg">No posts found.</div>'; return; }
-    const total = t.postCount || posts.length;
-    const sampled = posts.length < total;
-    const first = Date.parse(posts[0].dateCreated);
-    const last = Date.parse(t.dateOfLastPost) || Date.parse(posts[posts.length - 1].dateCreated);
-    const posters = {}, quoted = {};
-    posts.forEach((p) => {
-      posters[p.authorUsername || "?"] = (posters[p.authorUsername || "?"] || 0) + 1;
-      const re = /\[quote=([^\]]+)\]/gi; let m;
-      while ((m = re.exec(p.body || ""))) { const a = m[1].trim(); if (a) quoted[a] = (quoted[a] || 0) + 1; }
     });
-    const sortT = (o) => Object.entries(o).sort((a, b) => b[1] - a[1]);
-    const topP = sortT(posters).slice(0, 5), topQ = sortT(quoted).slice(0, 5);
-    const maxP = topP.length ? topP[0][1] : 1;
+    if (!wrap.childNodes.length) { const d = document.createElement("div"); d.className = "rd-text mute2"; d.textContent = "(no text)"; wrap.appendChild(d); }
+    return wrap;
+  }
+
+  function renderReaderPost(p, n) {
+    const el = document.createElement("div"); el.className = "rd-post";
+    const head = document.createElement("div"); head.className = "rd-head";
+    head.innerHTML =
+      `<span class="rd-num">#${n}</span>` +
+      `<span class="rd-author">${esc(p.authorUsername || "?")}</span>` +
+      `<span class="rd-time">${esc(fmtDateTime(p.dateCreated))}</span>`;
+    const body = document.createElement("div"); body.className = "rd-body";
+    body.appendChild(renderPostBody(p.body || ""));
+    el.append(head, body);
+    return el;
+  }
+
+  function updateReaderFooter(t, exp) {
+    const total = t.postCount || exp._count;
+    const old = exp.querySelector(".rd-foot"); if (old) old.remove();
+    const foot = document.createElement("div"); foot.className = "rd-foot";
+    const info = document.createElement("span"); info.className = "rd-info";
+    info.textContent = `Showing ${exp._count} of ${total}`;
+    const spacer = document.createElement("span"); spacer.className = "grow";
+    foot.append(info, spacer);
+    const canMore = exp._dir === "new" ? exp._page > 1 : exp._page < exp._totalPages;
+    if (canMore) {
+      const more = document.createElement("button"); more.className = "rd-more btn btn-sm btn-accent";
+      more.textContent = exp._dir === "new" ? "Load older 30 ↑" : "Load next 30 ↓";
+      more.addEventListener("click", () => loadThreadPage(t, exp, exp._dir === "new" ? exp._page - 1 : exp._page + 1));
+      foot.appendChild(more);
+    }
+    const open = document.createElement("button"); open.className = "btn btn-sm btn-ghost";
+    open.textContent = "Open in forum ↗";
+    open.addEventListener("click", () => chrome.tabs.create({ url: `${PT_ORIGIN}/bands/phish/threads/${t.id}/${t.slug || ""}` }));
+    foot.appendChild(open);
+    exp.appendChild(foot);
+  }
+
+  async function loadThreadPage(t, exp, page) {
+    const box = exp.querySelector(".rd-posts");
+    const btn = exp.querySelector(".rd-more");
+    if (btn) { btn.disabled = true; btn.textContent = "Loading…"; }
+    const isFirst = page === exp._startPage;
+    try {
+      const r = await fetch(`${PT_ORIGIN}/api/bands/1/threads/${t.id}/posts?page=${page}&pageSize=30`,
+        { credentials: "omit", headers: { "X-Requested-With": "XMLHttpRequest", Accept: "*/*" } });
+      const posts = r.ok ? await r.json() : [];
+      if (isFirst) box.textContent = "";
+      if (!Array.isArray(posts) || !posts.length) {
+        if (isFirst) box.innerHTML = '<div class="texp-msg">No posts found.</div>';
+        return;
+      }
+      const frag = document.createDocumentFragment();
+      posts.forEach((p, i) => frag.appendChild(renderReaderPost(p, (page - 1) * 30 + i + 1)));
+      if (exp._dir === "new" && !isFirst) box.insertBefore(frag, box.firstChild); // older page → prepend
+      else box.appendChild(frag);
+      exp._count += posts.length; exp._page = page;
+      updateReaderFooter(t, exp);
+      if (exp._dir === "new" && isFirst) { const lastEl = box.lastElementChild; if (lastEl) lastEl.scrollIntoView({ block: "nearest" }); }
+    } catch (_) {
+      if (isFirst) box.innerHTML = '<div class="texp-msg">Couldn’t load this thread.</div>';
+    }
+  }
+
+  /* ===== dedicated thread view (full-panel overlay) ===== */
+  let tvT = null, tvDir = "old", tvPage = 1, tvStartPage = 1, tvTotalPages = 1, tvCount = 0, tvQuery = "";
+  function openThreadView(t) {
+    tvT = t; tvDir = "old"; tvTotalPages = Math.max(1, Math.ceil((t.postCount || 1) / 30)); tvQuery = "";
     const url = `${PT_ORIGIN}/bands/phish/threads/${t.id}/${t.slug || ""}`;
-
-    const metrics = document.createElement("div"); metrics.className = "texp-metrics";
-    metrics.innerHTML = tmetric(total, "posts") + tmetric(Object.keys(posters).length + (sampled ? "+" : ""), "posters") + tmetric(fmtSpan(last - first), "active");
-    exp.appendChild(metrics);
-
-    const cols = document.createElement("div"); cols.className = "texp-cols";
-    const c1 = document.createElement("div"); c1.className = "texp-col";
-    c1.innerHTML = '<div class="texp-h">Top posters' + (sampled ? ' <span class="texp-note">· first ' + posts.length + '</span>' : '') + '</div>';
-    topP.forEach(([a, n]) => {
-      const row = document.createElement("div"); row.className = "texp-bar-row";
-      row.innerHTML = `<span class="texp-bar-name">${esc(a)}</span><span class="texp-bar-wrap"><span class="texp-bar" style="width:${Math.round(n / maxP * 100)}%"></span></span><span class="texp-bar-n">${n}</span>`;
-      c1.appendChild(row);
-    });
-    cols.appendChild(c1);
-    const c2 = document.createElement("div"); c2.className = "texp-col";
-    c2.innerHTML = '<div class="texp-h">Most quoted</div>' + (topQ.length ? "" : '<div class="texp-note">—</div>');
-    topQ.forEach(([a, n]) => {
-      const row = document.createElement("div"); row.className = "texp-q-row";
-      row.innerHTML = `<span class="texp-q-name">${esc(a)}</span><span class="texp-q-n">↩ ${n}</span>`;
-      c2.appendChild(row);
-    });
-    cols.appendChild(c2);
-    exp.appendChild(cols);
-
-    const op = posts[0];
-    const opEl = document.createElement("div"); opEl.className = "texp-op";
-    opEl.innerHTML = `<div class="texp-h">Original post — ${esc(op.authorUsername || "?")}</div>`;
-    const opBody = document.createElement("div"); opBody.className = "texp-op-body";
-    opBody.textContent = (cleanText(op.body) || "(no text)").slice(0, 320);
-    opEl.appendChild(opBody);
-    exp.appendChild(opEl);
-
-    const open = document.createElement("button"); open.className = "btn btn-sm btn-accent"; open.style.marginTop = "10px"; open.textContent = "Open thread ↗";
-    open.addEventListener("click", () => chrome.tabs.create({ url }));
-    exp.appendChild(open);
+    $("#tvTitle").textContent = t.subject || "Thread"; $("#tvTitle").title = t.subject || "";
+    $("#tvOrder").textContent = "Oldest first ⇅";
+    $("#tvSearch").value = ""; $("#tvSearchClear").hidden = true;
+    $("#tvOpen").onclick = () => chrome.tabs.create({ url });
+    $("#tvReply").onclick = () => chrome.tabs.create({ url }); // native in-panel reply lands once you send the POST endpoints
+    $("#threadView").hidden = false;
+    tvStart();
   }
+  function tvStart() {
+    const inner = $("#tvPosts .tv-inner"); inner.innerHTML = '<div class="texp-msg">Loading thread…</div>';
+    $("#tvFoot").textContent = "";
+    tvCount = 0; tvStartPage = tvDir === "new" ? tvTotalPages : 1; tvPage = tvStartPage;
+    tvLoadPage(tvStartPage);
+  }
+  async function tvLoadPage(page) {
+    const inner = $("#tvPosts .tv-inner");
+    const btn = $("#tvFoot .rd-more"); if (btn) { btn.disabled = true; btn.textContent = "Loading…"; }
+    const isFirst = page === tvStartPage;
+    try {
+      const r = await fetch(`${PT_ORIGIN}/api/bands/1/threads/${tvT.id}/posts?page=${page}&pageSize=30`,
+        { credentials: "omit", headers: { "X-Requested-With": "XMLHttpRequest", Accept: "*/*" } });
+      const posts = r.ok ? await r.json() : [];
+      if (isFirst) inner.textContent = "";
+      if (!Array.isArray(posts) || !posts.length) { if (isFirst) inner.innerHTML = '<div class="texp-msg">No posts found.</div>'; return; }
+      const frag = document.createDocumentFragment();
+      posts.forEach((p, i) => { const el = renderReaderPost(p, (page - 1) * 30 + i + 1); el.dataset.text = el.textContent.toLowerCase(); frag.appendChild(el); });
+      if (tvDir === "new" && !isFirst) inner.insertBefore(frag, inner.firstChild); else inner.appendChild(frag);
+      tvCount += posts.length; tvPage = page;
+      tvApplySearch(); tvRenderFoot();
+      if (tvDir === "new" && isFirst) { const last = inner.lastElementChild; if (last) last.scrollIntoView({ block: "nearest" }); }
+    } catch (_) { if (isFirst) inner.innerHTML = '<div class="texp-msg">Couldn’t load this thread.</div>'; }
+  }
+  function tvRenderFoot() {
+    const foot = $("#tvFoot"); foot.textContent = "";
+    const total = tvT.postCount || tvCount;
+    const info = document.createElement("span"); info.className = "rd-info"; info.textContent = `Showing ${tvCount} of ${total}`;
+    const spacer = document.createElement("span"); spacer.className = "grow"; foot.append(info, spacer);
+    const canMore = tvDir === "new" ? tvPage > 1 : tvPage < tvTotalPages;
+    if (canMore) {
+      const more = document.createElement("button"); more.className = "rd-more btn btn-sm btn-accent";
+      more.textContent = tvDir === "new" ? "Load older 30 ↑" : "Load next 30 ↓";
+      more.addEventListener("click", () => tvLoadPage(tvDir === "new" ? tvPage - 1 : tvPage + 1));
+      foot.appendChild(more);
+    }
+  }
+  function tvApplySearch() {
+    const q = tvQuery.trim().toLowerCase();
+    const inner = $("#tvPosts .tv-inner");
+    [...inner.children].forEach((el) => { if (!el.dataset.text) return; el.style.display = (!q || el.dataset.text.includes(q)) ? "" : "none"; });
+  }
+  $("#tvBack").addEventListener("click", () => { $("#threadView").hidden = true; tvT = null; });
+  $("#tvOrder").addEventListener("click", () => { tvDir = tvDir === "old" ? "new" : "old"; $("#tvOrder").textContent = (tvDir === "old" ? "Oldest first" : "Newest first") + " ⇅"; tvStart(); });
+  const tvSearchInput = $("#tvSearch"), tvSearchClear = $("#tvSearchClear");
+  tvSearchInput.addEventListener("input", () => { tvQuery = tvSearchInput.value; tvSearchClear.hidden = !tvQuery; tvApplySearch(); });
+  tvSearchClear.addEventListener("click", () => { tvSearchInput.value = ""; tvQuery = ""; tvSearchClear.hidden = true; tvApplySearch(); tvSearchInput.focus(); });
+
   function renderBoard() {
     document.querySelectorAll("#boardSort button").forEach((x) => x.classList.toggle("on", x.dataset.sort === boardSort));
-    let items = boardTopics.filter((t) => boardGroup === "all" || groupOf(t.subject) === boardGroup);
-    items = items.slice().sort((a, b) =>
-      boardSort === "busiest" ? (b.postCount - a.postCount) : (Date.parse(b.dateOfLastPost) - Date.parse(a.dateOfLastPost))
-    );
-    const box = $("#boardList");
-    box.textContent = "";
-    $("#boardStatus").textContent = items.length + " active topics";
-    if (!items.length) { const e = document.createElement("div"); e.className = "feed-empty"; e.textContent = "No topics."; box.appendChild(e); return; }
+    document.querySelectorAll("#boardHead [data-sort]").forEach((h) => h.classList.toggle("on", h.dataset.sort === boardSort));
+    const box = $("#boardList"); box.textContent = "";
+    $("#boardGroups").style.display = boardSort === "saved" ? "none" : "";
+    $("#boardHead").style.display = boardViewMode === "table" ? "" : "none"; // header only in table view
+    const empty = (msg) => { const e = document.createElement("div"); e.className = "feed-empty"; e.textContent = msg; box.appendChild(e); };
+
+    // Saved ("My Threads") — from local storage, independent of the active fetch
+    if (boardSort === "saved") {
+      const items = boardSaved.filter(matchesQuery).slice().sort((a, b) => parseUTC(b.dateOfLastPost) - parseUTC(a.dateOfLastPost));
+      $("#boardStatus").textContent = items.length + " saved thread" + (items.length === 1 ? "" : "s");
+      if (!items.length) { empty("No saved threads yet — tap ☆ on any thread to keep it here."); return; }
+      items.forEach((t) => box.appendChild(topicRow(t)));
+      return;
+    }
+
+    // Active / Busiest — pinned first, hidden removed
+    let list = boardTopics.filter((t) => !boardHidden.has(String(t.id)) && matchesQuery(t));
+    if (boardGroup !== "all") list = list.filter((t) => groupOf(t.subject) === boardGroup);
+    list.sort((a, b) => boardSort === "busiest" ? (b.postCount - a.postCount) : (parseUTC(b.dateOfLastPost) - parseUTC(a.dateOfLastPost)));
+    const items = [...list.filter((t) => boardPinned.has(String(t.id))), ...list.filter((t) => !boardPinned.has(String(t.id)))];
+
+    const hiddenCount = boardTopics.filter((t) => boardHidden.has(String(t.id))).length;
+    $("#boardStatus").textContent = items.length + " topics" + (hiddenCount ? " · " + hiddenCount + " hidden" : "");
+    if (!items.length && !hiddenCount) { empty("No topics."); return; }
     items.forEach((t) => box.appendChild(topicRow(t)));
+
+    if (hiddenCount) {
+      const toggle = document.createElement("button"); toggle.className = "board-hidden-toggle";
+      toggle.textContent = (boardShowHidden ? "▲ Hide " : "▾ Show ") + hiddenCount + " hidden";
+      toggle.addEventListener("click", () => { boardShowHidden = !boardShowHidden; renderBoard(); });
+      box.appendChild(toggle);
+      if (boardShowHidden) {
+        boardTopics.filter((t) => boardHidden.has(String(t.id)))
+          .sort((a, b) => parseUTC(b.dateOfLastPost) - parseUTC(a.dateOfLastPost))
+          .forEach((t) => { const row = topicRow(t); row.classList.add("is-hidden"); box.appendChild(row); });
+      }
+    }
+
+    if (boardHasMore) {
+      const more = document.createElement("button"); more.className = "board-hidden-toggle board-more";
+      more.textContent = "Load more threads ↓";
+      more.addEventListener("click", () => { more.textContent = "Loading…"; more.disabled = true; loadMoreThreads(); });
+      box.appendChild(more);
+    }
   }
+  document.querySelectorAll("#boardHead [data-sort]").forEach((h) =>
+    h.addEventListener("click", () => { boardSort = h.dataset.sort; renderBoard(); })
+  );
   document.querySelectorAll("#boardSort button").forEach((b) =>
     b.addEventListener("click", () => { boardSort = b.dataset.sort; renderBoard(); })
   );
-  $("#boardRefresh").addEventListener("click", loadBoard);
+  $("#boardRefresh").addEventListener("click", () => loadBoard(true));
+  const boardSearchInput = $("#boardSearch"), boardSearchClear = $("#boardSearchClear");
+  boardSearchInput.addEventListener("input", () => { boardQuery = boardSearchInput.value.trim().toLowerCase(); boardSearchClear.hidden = !boardQuery; renderBoard(); });
+  boardSearchClear.addEventListener("click", () => { boardSearchInput.value = ""; boardQuery = ""; boardSearchClear.hidden = true; renderBoard(); boardSearchInput.focus(); });
+  function syncViewBtn() { const b = $("#boardView"); b.textContent = boardViewMode === "table" ? "☰" : "⊞"; b.title = boardViewMode === "table" ? "Switch to card view" : "Switch to table view"; }
+  $("#boardView").addEventListener("click", () => { boardViewMode = boardViewMode === "table" ? "cards" : "table"; saveBoardState(); syncViewBtn(); renderBoard(); });
+  loadBoardState(syncViewBtn);
 
   /* ============ settings ============ */
   function saveSettings() { chrome.storage.sync.set({ [SETTINGS]: settings }); }
@@ -547,13 +808,6 @@
     else document.documentElement.removeAttribute("data-theme");
   }
   function renderSkin() { document.querySelectorAll("#skinSeg button").forEach((b) => b.classList.toggle("on", b.dataset.skin === (settings.skin || "original"))); }
-  function renderAssay() {
-    const r = settings.remix || {};
-    $("#rx-enabled").checked = r.enabled !== false;
-    $("#rx-badges").checked = r.badges !== false;
-    $("#rx-panel").checked = r.panel !== false;
-    $("#rx-topn").textContent = String(r.topN || 5);
-  }
   function renderSettings() {
     $("#myHandle").value = settings.myHandle || "";
     const m = settings.monitor;
@@ -567,10 +821,9 @@
     $("#lookbackDays").value = String(m.lookbackDays || 60);
     $("#mod-enabled").checked = settings.enabled !== false;
     renderChips("handles"); renderChips("keywords"); renderChips("watchKeywords");
-    renderSkin(); renderAssay(); applyTheme();
+    renderSkin(); applyTheme();
   }
   const setMon = (k, v) => { settings.monitor = { ...settings.monitor, [k]: v }; saveSettings(); };
-  const setRemix = (k, v) => { settings.remix = { ...(settings.remix || {}), [k]: v }; saveSettings(); renderAssay(); };
 
   $("#handleForm").addEventListener("submit", (e) => { e.preventDefault(); settings.myHandle = $("#myHandle").value.trim().replace(/^@+/, ""); saveSettings(); render(); });
   $("#myHandle").addEventListener("blur", () => { const v = $("#myHandle").value.trim().replace(/^@+/, ""); if (v !== settings.myHandle) { settings.myHandle = v; saveSettings(); render(); } });
@@ -584,11 +837,6 @@
   $("#lookbackDays").addEventListener("change", (e) => setMon("lookbackDays", parseInt(e.target.value, 10)));
   $("#mod-enabled").addEventListener("change", (e) => { settings.enabled = e.target.checked; saveSettings(); });
   document.querySelectorAll("#skinSeg button").forEach((b) => b.addEventListener("click", () => { settings.skin = b.dataset.skin; saveSettings(); renderSkin(); applyTheme(); }));
-  $("#rx-enabled").addEventListener("change", (e) => setRemix("enabled", e.target.checked));
-  $("#rx-badges").addEventListener("change", (e) => setRemix("badges", e.target.checked));
-  $("#rx-panel").addEventListener("change", (e) => setRemix("panel", e.target.checked));
-  $("#rx-dec").addEventListener("click", () => setRemix("topN", Math.max(3, ((settings.remix || {}).topN || 5) - 1)));
-  $("#rx-inc").addEventListener("click", () => setRemix("topN", Math.min(15, ((settings.remix || {}).topN || 5) + 1)));
 
   /* ============ live ============ */
   chrome.storage.onChanged.addListener((c, area) => {
@@ -608,6 +856,7 @@
     settings = normalize(st);
     renderSettings();
     render();
+    loadBoardState(); // saved / pinned / hidden threads (ready before Board opens)
     // Pick up new mentions the moment the panel opens (not just on the timer).
     if (settings.myHandle || (settings.watchKeywords || []).length) {
       checkBtn.classList.add("spin");
@@ -623,7 +872,6 @@
     s = s || {};
     ["handles", "keywords", "watchKeywords"].forEach((k) => { s[k] = Array.isArray(s[k]) ? s[k] : []; });
     s.monitor = { ...MON_DEFAULTS, ...(s.monitor || {}) };
-    s.remix = { enabled: true, badges: true, panel: true, topN: 5, ...(s.remix || {}) };
     s.skin = s.skin || "original";
     s.enabled = s.enabled !== false;
     s.myHandle = typeof s.myHandle === "string" ? s.myHandle : "";
